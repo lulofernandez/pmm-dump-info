@@ -87,13 +87,13 @@
   }
   (function () {
     let t = "dark";
-    try { t = localStorage.getItem("pmm-dump-inspect-theme") || "dark"; } catch (_) { /* storage blocked */ }
+    try { t = localStorage.getItem("pmm-dump-info-theme") || "dark"; } catch (_) { /* storage blocked */ }
     applyTheme(t);
   })();
   themeBtn.addEventListener("click", () => {
     const t = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
     applyTheme(t);
-    try { localStorage.setItem("pmm-dump-inspect-theme", t); } catch (_) { /* storage blocked */ }
+    try { localStorage.setItem("pmm-dump-info-theme", t); } catch (_) { /* storage blocked */ }
     drawCharts();
   });
 

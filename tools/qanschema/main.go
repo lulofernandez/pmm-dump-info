@@ -18,7 +18,7 @@ import (
 	"sort"
 	"strings"
 
-	"pmm-dump-inspect/internal/qantype"
+	"pmm-dump-info/internal/qantype"
 )
 
 type column struct{ name, typ string }

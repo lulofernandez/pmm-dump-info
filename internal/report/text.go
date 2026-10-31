@@ -11,7 +11,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"pmm-dump-inspect/internal/inspect"
+	"pmm-dump-info/internal/inspect"
 )
 
 // WriteText prints the report for a terminal.

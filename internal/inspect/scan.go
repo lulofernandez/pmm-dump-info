@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"pmm-dump-inspect/internal/dump"
+	"pmm-dump-info/internal/dump"
 )
 
 // Scan reads the whole dump once. With deep=false only meta.json, log.json

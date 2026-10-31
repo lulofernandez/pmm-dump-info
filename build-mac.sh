@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Build pmm-dump-inspect for macOS (Finder app) and Linux (copy to the lab hosts).
+# Build pmm-dump-info for macOS (Finder app) and Linux (copy to the lab hosts).
 #
 # Usage:
-#   ./build-mac.sh            # universal binary (arm64 + amd64) -> dist/pmm-dump-inspect
-#   ./build-mac.sh native     # only the current architecture   -> dist/pmm-dump-inspect
-#   both also build dist/pmm-dump-inspect-linux-amd64
+#   ./build-mac.sh            # universal binary (arm64 + amd64) -> dist/pmm-dump-info
+#   ./build-mac.sh native     # only the current architecture   -> dist/pmm-dump-info
+#   both also build dist/pmm-dump-info-linux-amd64
 #
 # Before building it checks the QAN schemas against the PMM repo
 # (tools/update-qan-schema.sh --check); SKIP_QAN_CHECK=1 skips it (offline).
@@ -42,12 +42,12 @@ build() { # $1 = GOARCH, $2 = output path
 
 case "$MODE" in
   native)
-    build "$("$GO" env GOHOSTARCH)" "$DIST/pmm-dump-inspect"
+    build "$("$GO" env GOHOSTARCH)" "$DIST/pmm-dump-info"
     ;;
   universal)
-    build arm64 "$DIST/pmm-dump-inspect-darwin-arm64"
-    build amd64 "$DIST/pmm-dump-inspect-darwin-amd64"
-    lipo -create -output "$DIST/pmm-dump-inspect" "$DIST/pmm-dump-inspect-darwin-arm64" "$DIST/pmm-dump-inspect-darwin-amd64"
+    build arm64 "$DIST/pmm-dump-info-darwin-arm64"
+    build amd64 "$DIST/pmm-dump-info-darwin-amd64"
+    lipo -create -output "$DIST/pmm-dump-info" "$DIST/pmm-dump-info-darwin-arm64" "$DIST/pmm-dump-info-darwin-amd64"
     ;;
   *)
     echo "unknown mode: $MODE (use 'universal' or 'native')" >&2
@@ -55,7 +55,7 @@ case "$MODE" in
     ;;
 esac
 
-chmod +x "$DIST/pmm-dump-inspect"
+chmod +x "$DIST/pmm-dump-info"
 echo ">> building linux/amd64"
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "$GO" build -trimpath -ldflags "-s -w" -o "$DIST/pmm-dump-inspect-linux-amd64" .
-echo ">> done: $DIST/pmm-dump-inspect ($(lipo -archs "$DIST/pmm-dump-inspect"))"
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "$GO" build -trimpath -ldflags "-s -w" -o "$DIST/pmm-dump-info-linux-amd64" .
+echo ">> done: $DIST/pmm-dump-info ($(lipo -archs "$DIST/pmm-dump-info"))"

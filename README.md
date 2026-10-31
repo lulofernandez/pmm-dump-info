@@ -1,4 +1,4 @@
-# pmm-dump-inspect
+# pmm-dump-info
 
 Reads a [pmm-dump](https://github.com/percona/pmm-dump) file (the `.tar.gz` a customer exports from PMM) without importing it into a PMM Server, and reports:
 
@@ -52,7 +52,7 @@ Version checks:
 ./build-mac.sh
 ```
 
-Builds `dist/pmm-dump-inspect` (macOS universal) and `dist/pmm-dump-inspect-linux-amd64` (copy it to the lab hosts). Plain `go build -o pmm-dump-inspect .` works too (Go 1.24 or later, standard library only).
+Builds `dist/pmm-dump-info` (macOS universal) and `dist/pmm-dump-info-linux-amd64` (copy it to the lab hosts). Plain `go build -o pmm-dump-info .` works too (Go 1.24 or later, standard library only).
 
 ## Finder (macOS)
 
@@ -60,12 +60,12 @@ Builds `dist/pmm-dump-inspect` (macOS universal) and `dist/pmm-dump-inspect-linu
 ./install-finder.sh
 ```
 
-Installs `~/Applications/pmm-dump-inspect.app`. Right-click a dump > Open With > pmm-dump-inspect: the HTML report is written next to the dump and opened in the browser. Several files can be selected at once. Errors are shown in a dialog. The app runs `dist/pmm-dump-inspect` from this repo, so after a change `./build-mac.sh` is enough.
+Installs `~/Applications/pmm-dump-info.app`. Right-click a dump > Open With > pmm-dump-info: the HTML report is written next to the dump and opened in the browser. Several files can be selected at once. Errors are shown in a dialog. The app runs `dist/pmm-dump-info` from this repo, so after a change `./build-mac.sh` is enough.
 
 ## Use
 
 ```
-pmm-dump-inspect [flags] <pmm-dump.tar.gz>
+pmm-dump-info [flags] <pmm-dump.tar.gz>
   -html          write the HTML report (<dump>.html next to the dump) instead of text
   -o <file>      HTML output file (implies -html)
   -open          write the HTML report and open it (implies -html)

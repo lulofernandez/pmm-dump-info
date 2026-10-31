@@ -1,6 +1,6 @@
--- Finder launcher for pmm-dump-inspect: writes the HTML report of each
+-- Finder launcher for pmm-dump-info: writes the HTML report of each
 -- selected pmm-dump file (next to the file) and opens it in the browser.
--- Compiled into ~/Applications/pmm-dump-inspect.app by install-finder.sh.
+-- Compiled into ~/Applications/pmm-dump-info.app by install-finder.sh.
 
 property inspectBin : "__BIN__"
 
@@ -18,7 +18,7 @@ on open theFiles
 		set AppleScript's text item delimiters to return & return
 		set msg to failed as text
 		set AppleScript's text item delimiters to ""
-		display dialog msg with title "pmm-dump-inspect" buttons {"OK"} default button "OK" with icon caution
+		display dialog msg with title "pmm-dump-info" buttons {"OK"} default button "OK" with icon caution
 	end if
 end open
 

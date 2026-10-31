@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"pmm-dump-inspect/internal/inspect"
+	"pmm-dump-info/internal/inspect"
 )
 
 //go:embed assets/page.html assets/app.js assets/style.css

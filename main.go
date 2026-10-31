@@ -1,4 +1,4 @@
-// pmm-dump-inspect reads a pmm-dump file without importing it into PMM and
+// pmm-dump-info reads a pmm-dump file without importing it into PMM and
 // reports versions, export arguments, services with metrics and QAN, and the
 // time range covered.
 package main
@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"pmm-dump-inspect/internal/inspect"
-	"pmm-dump-inspect/internal/report"
+	"pmm-dump-info/internal/inspect"
+	"pmm-dump-info/internal/report"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 	pass := flag.String("pass", "", "password of an encrypted dump (also env PMM_DUMP_PASS)")
 	workers := flag.Int("j", 4, "chunks parsed in parallel (keep it low on shared hosts)")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: pmm-dump-inspect [flags] <pmm-dump.tar.gz>\n")
+		fmt.Fprintf(os.Stderr, "usage: pmm-dump-info [flags] <pmm-dump.tar.gz>\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -46,7 +46,7 @@ func main() {
 	r, err := inspect.Scan(in, *pass, !*quick, *skipQAN, *workers)
 	var qe *inspect.QANSchemaError
 	if errors.As(err, &qe) {
-		fmt.Fprintln(os.Stderr, "pmm-dump-inspect:", err)
+		fmt.Fprintln(os.Stderr, "pmm-dump-info:", err)
 		os.Exit(3)
 	}
 	if err != nil {
@@ -87,6 +87,6 @@ func main() {
 }
 
 func fail(err error) {
-	fmt.Fprintln(os.Stderr, "pmm-dump-inspect:", err)
+	fmt.Fprintln(os.Stderr, "pmm-dump-info:", err)
 	os.Exit(1)
 }
