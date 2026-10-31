@@ -1,67 +1,55 @@
 package inspect
 
 import (
-	_ "embed"
 	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"sort"
 	"strings"
-	"time"
 )
 
 // The ch/*.tsv files are "SELECT * FROM metrics" of the PMM ClickHouse,
 // written by pmm-dump with encoding/csv (tab separated, no header). The
-// column order is the one of pmm.metrics in the exporting PMM.
-//
-//go:embed qan_columns.txt
-var qanColumnsFile string
+// column order is the one of pmm.metrics in the exporting PMM, which is only
+// known at the end (meta.json is the last tar entry): every row is checked
+// against all known schemas with its column count, and summary picks the one
+// of the PMM version. A row that matches none stops the scan.
 
-// qanSchemas maps a column count to the column names, from qan_columns.txt.
-var qanSchemas = parseSchemas(qanColumnsFile)
-
-func parseSchemas(s string) map[int][]string {
-	out := map[int][]string{}
-	var cur []string
-	flush := func() {
-		if len(cur) > 0 {
-			out[len(cur)] = cur
-		}
-		cur = nil
-	}
-	for _, l := range strings.Split(s, "\n") {
-		l = strings.TrimSpace(l)
-		switch {
-		case strings.HasPrefix(l, "#"):
-		case l == "":
-			flush()
-		default:
-			cur = append(cur, strings.Fields(l)[0])
-		}
-	}
-	flush()
-	return out
+// QANSchemaError means the QAN rows do not match the known pmm.metrics
+// layouts: qan_columns.txt is out of date for this dump.
+type QANSchemaError struct {
+	PMMVersion string
+	Columns    int
+	Detail     string // first mismatch
 }
 
-// pmm-dump writes DateTime values with fmt %v of a time.Time.
-var goTime = regexp.MustCompile(`^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4} [A-Z]+$`)
-
-func parseGoTime(s string) (int64, bool) {
-	t, err := time.Parse("2006-01-02 15:04:05 -0700 MST", s)
-	if err != nil {
-		return 0, false
+func (e *QANSchemaError) Error() string {
+	ver := e.PMMVersion
+	if ver == "" {
+		ver = "version unknown"
 	}
-	return t.UnixMilli(), true
+	set := QANSchemas
+	return fmt.Sprintf("unknown QAN column layout: %s\n"+
+		"  dump: PMM %s, %d columns per ch/ row\n"+
+		"  known pmm.metrics schemas: %s, latest release %s, checked %s\n"+
+		"  update them with tools/update-qan-schema.sh and rebuild (./build-mac.sh);\n"+
+		"  meanwhile -skip-qan reports everything except QAN",
+		e.Detail, ver, e.Columns, set.Source, set.LatestRelease, set.Checked)
 }
-
-type qanCols struct{ service, node, kind, queryid, period int }
 
 type qanScanner struct {
-	s        QANSummary
-	cols     *qanCols
-	services map[string]*qanAcc
+	s     QANSummary
+	cands []*qanCandidate
+	fail  string // why the rows match no schema; stops reading ch/
+}
+
+// qanCandidate is one schema the rows may follow, with its own totals.
+type qanCandidate struct {
+	schema                               *QANSchema
+	service, node, kind, queryid, period int
+	services                             map[string]*qanAcc
+	fail                                 string // first mismatch
 }
 
 type qanAcc struct {
@@ -69,12 +57,12 @@ type qanAcc struct {
 	queries map[string]bool
 }
 
-func newQANScanner() *qanScanner { return &qanScanner{services: map[string]*qanAcc{}} }
+func newQANScanner() *qanScanner { return &qanScanner{} }
 
 func (q *qanScanner) add(name string, size int64, rd io.Reader, deep bool) {
 	q.s.Files = append(q.s.Files, name)
 	q.s.Bytes += size
-	if !deep || size == 0 {
+	if !deep || size == 0 || q.fail != "" {
 		return
 	}
 	cr := csv.NewReader(rd)
@@ -82,7 +70,7 @@ func (q *qanScanner) add(name string, size int64, rd io.Reader, deep bool) {
 	cr.FieldsPerRecord = -1
 	cr.LazyQuotes = true
 	cr.ReuseRecord = true
-	for {
+	for n := 1; q.fail == ""; n++ {
 		rec, err := cr.Read()
 		if errors.Is(err, io.EOF) {
 			return
@@ -93,39 +81,81 @@ func (q *qanScanner) add(name string, size int64, rd io.Reader, deep bool) {
 			}
 			return
 		}
-		q.row(rec)
+		q.row(name, n, rec)
 	}
 }
 
-func (q *qanScanner) row(rec []string) {
+func (q *qanScanner) row(file string, n int, rec []string) {
 	q.s.Rows++
-	if q.s.Columns == 0 {
+	if q.cands == nil {
 		q.s.Columns = len(rec)
-	}
-	if q.cols == nil {
-		q.cols = q.identify(rec)
-	}
-	c := q.cols
-	get := func(i int) string {
-		if i < 0 || i >= len(rec) {
-			return ""
+		for _, s := range QANSchemas.withColumns(len(rec)) {
+			q.cands = append(q.cands, &qanCandidate{
+				schema: s, service: s.index("service_name"), node: s.index("node_name"),
+				kind: s.index("service_type"), queryid: s.index("queryid"), period: s.index("period_start"),
+				services: map[string]*qanAcc{},
+			})
 		}
-		return rec[i]
+		if len(q.cands) == 0 {
+			var counts []string
+			for _, s := range QANSchemas.Schemas {
+				counts = append(counts, fmt.Sprintf("%d (PMM %s)", len(s.Cols), s.Since))
+			}
+			q.fail = fmt.Sprintf("ch/%s has %d columns, no known schema has that many (known: %s)",
+				file, len(rec), strings.Join(counts, ", "))
+			return
+		}
 	}
-	ts, _ := parseGoTime(get(c.period))
-	svc := get(c.service)
+	if len(rec) != q.s.Columns {
+		q.fail = fmt.Sprintf("ch/%s row %d has %d columns, the first row had %d", file, n, len(rec), q.s.Columns)
+		return
+	}
+	alive := false
+	for _, c := range q.cands {
+		if c.fail != "" {
+			continue
+		}
+		if c.fail = c.check(file, n, rec); c.fail == "" {
+			c.add(rec)
+			alive = true
+		}
+	}
+	if !alive {
+		q.fail = q.cands[0].fail // newest schema
+	}
+}
+
+func (c *qanCandidate) check(file string, n int, rec []string) string {
+	for i, col := range c.schema.Cols {
+		if !col.check(rec[i]) {
+			v := rec[i]
+			if len(v) > 60 {
+				v = v[:60] + "..."
+			}
+			return fmt.Sprintf("ch/%s row %d column %d (%s %s) holds %q", file, n, i+1, col.Name, col.Type, v)
+		}
+	}
+	return ""
+}
+
+func (c *qanCandidate) add(rec []string) {
+	ts, _ := parseGoTime(rec[c.period])
+	svc := rec[c.service]
 	if svc == "" {
 		svc = "(unknown service)"
 	}
-	a := q.services[svc]
+	a := c.services[svc]
 	if a == nil {
 		a = &qanAcc{queries: map[string]bool{}}
-		a.Name, a.Node, a.Kind = svc, get(c.node), get(c.kind)
+		a.Name, a.Kind = svc, rec[c.kind]
+		if c.node >= 0 {
+			a.Node = rec[c.node]
+		}
 		a.Buckets = map[int64]int64{}
-		q.services[svc] = a
+		c.services[svc] = a
 	}
 	a.Rows++
-	if id := get(c.queryid); id != "" {
+	if id := rec[c.queryid]; id != "" {
 		a.queries[id] = true
 	}
 	if ts > 0 {
@@ -139,34 +169,42 @@ func (q *qanScanner) row(rec []string) {
 	}
 }
 
-// identify finds the columns: by the known schema with the same column count
-// if its period_start looks like a date, otherwise only period_start by shape.
-func (q *qanScanner) identify(rec []string) *qanCols {
-	c := &qanCols{-1, -1, -1, -1, -1}
-	if names, ok := qanSchemas[len(rec)]; ok {
-		idx := map[string]int{}
-		for i, n := range names {
-			idx[n] = i
-		}
-		if p, ok := idx["period_start"]; ok && goTime.MatchString(rec[p]) {
-			c.service, c.node, c.kind, c.queryid, c.period = idx["service_name"], idx["node_name"], idx["service_type"], idx["queryid"], p
-			q.s.Schema = fmt.Sprintf("known pmm.metrics schema (%d columns)", len(rec))
-			return c
-		}
-	}
-	for i, v := range rec {
-		if goTime.MatchString(v) {
-			c.period = i
-			break
-		}
-	}
-	q.s.Schema = fmt.Sprintf("unknown pmm.metrics schema (%d columns): only rows and time range, no per-service split", len(rec))
-	return c
-}
-
-func (q *qanScanner) summary() QANSummary {
+// summary picks the schema of the exporting PMM version; it is an error when
+// the rows do not follow it.
+func (q *qanScanner) summary(pmm string) (QANSummary, error) {
 	s := q.s
-	for _, a := range q.services {
+	sort.Strings(s.Files)
+	if q.fail != "" {
+		return s, &QANSchemaError{pmm, s.Columns, q.fail}
+	}
+	if len(q.cands) == 0 {
+		return s, nil
+	}
+	var pick *qanCandidate
+	note := ""
+	if want := QANSchemas.forVersion(pmm); want != nil {
+		for _, c := range q.cands {
+			if c.schema == want {
+				pick = c
+			}
+		}
+		if pick == nil {
+			return s, &QANSchemaError{pmm, s.Columns, fmt.Sprintf("PMM %s has pmm.metrics %s, the rows have %d columns", pmm, want, s.Columns)}
+		}
+		if pick.fail != "" {
+			return s, &QANSchemaError{pmm, s.Columns, fmt.Sprintf("PMM %s has pmm.metrics %s, but %s", pmm, want, pick.fail)}
+		}
+	} else {
+		for _, c := range q.cands {
+			if c.fail == "" {
+				pick = c
+				break
+			}
+		}
+		note = fmt.Sprintf(" (PMM version %q not recognized, picked by column count and types)", pmm)
+	}
+	s.Schema = fmt.Sprintf("pmm.metrics %s, all rows match its column types%s", pick.schema, note)
+	for _, a := range pick.services {
 		a.Queries = len(a.queries)
 		if a.First != 0 && (s.First == 0 || a.First < s.First) {
 			s.First = a.First
@@ -177,6 +215,5 @@ func (q *qanScanner) summary() QANSummary {
 		s.Services = append(s.Services, a.QANService)
 	}
 	sort.Slice(s.Services, func(i, j int) bool { return s.Services[i].Name < s.Services[j].Name })
-	sort.Strings(s.Files)
-	return s
+	return s, nil
 }

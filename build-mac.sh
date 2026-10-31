@@ -5,6 +5,9 @@
 #   ./build-mac.sh            # universal binary (arm64 + amd64) -> dist/pmm-dump-inspect
 #   ./build-mac.sh native     # only the current architecture   -> dist/pmm-dump-inspect
 #   both also build dist/pmm-dump-inspect-linux-amd64
+#
+# Before building it checks the QAN schemas against the PMM repo
+# (tools/update-qan-schema.sh --check); SKIP_QAN_CHECK=1 skips it (offline).
 
 set -euo pipefail
 
@@ -20,6 +23,16 @@ echo ">> using $("$GO" version)"
 
 cd "$ROOT"
 mkdir -p "$DIST"
+
+if [ "${SKIP_QAN_CHECK:-0}" != 1 ]; then
+  rc=0
+  tools/update-qan-schema.sh --check || rc=$?
+  case $rc in
+    0) ;;
+    1) echo ">> WARNING: QAN schemas are out of date for the latest PMM: run tools/update-qan-schema.sh, then build again" >&2 ;;
+    *) echo ">> WARNING: could not check the QAN schemas (offline?); building with the current ones" >&2 ;;
+  esac
+fi
 
 build() { # $1 = GOARCH, $2 = output path
   echo ">> building darwin/$1"

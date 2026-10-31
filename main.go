@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -21,6 +22,7 @@ func main() {
 	out := flag.String("o", "", "output HTML file (implies -html)")
 	open := flag.Bool("open", false, "write the HTML report and open it (implies -html)")
 	quick := flag.Bool("quick", false, "only meta.json, log.json and the file list; do not read chunk contents")
+	skipQAN := flag.Bool("skip-qan", false, "do not read the QAN rows (ch/), e.g. when their column layout is unknown")
 	pass := flag.String("pass", "", "password of an encrypted dump (also env PMM_DUMP_PASS)")
 	workers := flag.Int("j", 4, "chunks parsed in parallel (keep it low on shared hosts)")
 	flag.Usage = func() {
@@ -41,7 +43,12 @@ func main() {
 	}
 
 	t0 := time.Now()
-	r, err := inspect.Scan(in, *pass, !*quick, *workers)
+	r, err := inspect.Scan(in, *pass, !*quick, *skipQAN, *workers)
+	var qe *inspect.QANSchemaError
+	if errors.As(err, &qe) {
+		fmt.Fprintln(os.Stderr, "pmm-dump-inspect:", err)
+		os.Exit(3)
+	}
 	if err != nil {
 		fail(err)
 	}

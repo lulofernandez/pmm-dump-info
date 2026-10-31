@@ -2,7 +2,6 @@ package inspect
 
 import (
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -22,10 +21,22 @@ func alerts(r *Result) []Alert {
 			msg += fmt.Sprintf("; log.json: ClickHouse returned %d rows for the filter and period", *r.Log.CHRows)
 		}
 		warn("%s", msg)
-	case r.Args.DumpQAN && r.Deep && r.QAN.Rows == 0:
+	case r.Args.DumpQAN && r.Deep && !r.QAN.Skipped && r.QAN.Rows == 0:
 		warn("QAN was requested and there are %d ch/ files, but they hold no rows", len(r.QAN.Files))
 	case !r.Args.DumpQAN && len(r.QAN.Files) == 0:
 		info("QAN not included: the export was done without --dump-qan")
+	}
+	if r.QAN.Skipped && len(r.QAN.Files) > 0 {
+		info("QAN rows not read (-skip-qan): only the ch/ files and their size are shown")
+	}
+	if r.Deep && r.QAN.Rows > 0 && QANSchemas.newerThanRelease(r.Meta.PMMServerVersion) {
+		warn("Dump from PMM %s, newer than the latest release the QAN schemas know (%s, checked %s). "+
+			"The rows match the newest known schema; refresh them with tools/update-qan-schema.sh",
+			r.Meta.PMMServerVersion, QANSchemas.LatestRelease, QANSchemas.Checked)
+	}
+	if len(r.QAN.Files) > 0 && QANSchemas.stale(time.Now()) {
+		info("QAN schemas last checked on %s, more than %d days ago: run tools/update-qan-schema.sh --check",
+			QANSchemas.Checked, int(staleAfter.Hours()/24))
 	}
 
 	// core metrics
@@ -86,7 +97,7 @@ func alerts(r *Result) []Alert {
 	}
 
 	// services with metrics but no QAN, when there is QAN
-	if r.Deep && len(r.QAN.Services) > 0 && !strings.HasPrefix(r.QAN.Schema, "unknown") {
+	if r.Deep && len(r.QAN.Services) > 0 {
 		have := map[string]bool{}
 		for _, q := range r.QAN.Services {
 			have[q.Name] = true

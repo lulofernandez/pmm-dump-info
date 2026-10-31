@@ -20,8 +20,10 @@ import (
 )
 
 // Scan reads the whole dump once. With deep=false only meta.json, log.json
-// and the tar index are read; chunk contents are skipped.
-func Scan(file, pass string, deep bool, workers int) (*Result, error) {
+// and the tar index are read; chunk contents are skipped. skipQAN skips only
+// the ch/ contents. A *QANSchemaError means the QAN rows follow no known
+// pmm.metrics layout.
+func Scan(file, pass string, deep, skipQAN bool, workers int) (*Result, error) {
 	d, err := dump.Open(file, pass)
 	if err != nil {
 		return nil, err
@@ -47,6 +49,8 @@ func Scan(file, pass string, deep bool, workers int) (*Result, error) {
 		}
 		dir, name := path.Split(h.Name)
 		switch {
+		case strings.HasPrefix(name, "._"): // macOS AppleDouble, from a dump repacked on a Mac
+			r.Other = append(r.Other, h.Name)
 		case dir == "" && name == "meta.json":
 			r.Meta = &Meta{}
 			if err := json.NewDecoder(d.Tar).Decode(r.Meta); err != nil {
@@ -57,7 +61,7 @@ func Scan(file, pass string, deep bool, workers int) (*Result, error) {
 		case dir == "vm/":
 			vm.add(name, h.Size, d.Tar, deep)
 		case dir == "ch/":
-			qan.add(name, h.Size, d.Tar, deep)
+			qan.add(name, h.Size, d.Tar, deep && !skipQAN)
 		default:
 			r.Other = append(r.Other, h.Name)
 		}
@@ -67,7 +71,10 @@ func Scan(file, pass string, deep bool, workers int) (*Result, error) {
 	}
 	r.Args = ParseArgs(r.Meta.Arguments)
 	r.VM = vm.summary(r.Meta.VMDataFormat)
-	r.QAN = qan.summary()
+	if r.QAN, err = qan.summary(r.Meta.PMMServerVersion); err != nil {
+		return nil, err
+	}
+	r.QAN.Skipped = skipQAN
 	r.Alerts = alerts(r)
 	return r, nil
 }

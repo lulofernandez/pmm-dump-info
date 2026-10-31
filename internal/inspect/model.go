@@ -114,6 +114,7 @@ type QANSummary struct {
 	Rows     int64        `json:"rows"`
 	Columns  int          `json:"columns"` // fields per row seen
 	Schema   string       `json:"schema"`  // how columns were identified
+	Skipped  bool         `json:"skipped"` // -skip-qan: rows not read
 	First    int64        `json:"first"`
 	Last     int64        `json:"last"`
 	Services []QANService `json:"services"`
