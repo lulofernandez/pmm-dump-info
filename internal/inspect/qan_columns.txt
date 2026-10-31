@@ -1,0 +1,4 @@
+# Column order of the ClickHouse table pmm.metrics, as "SELECT * FROM metrics"
+# returns it (DESCRIBE TABLE pmm.metrics). One block per schema, blocks
+# separated by an empty line; a dump is matched by its column count.
+# First word of each line is the column name, the rest is ignored.

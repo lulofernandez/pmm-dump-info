@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}} - pmm-dump-inspect</title>
+<style>{{CSS}}</style>
+</head>
+<body>
+<header class="top">
+  <div class="title-row">
+    <h1>PMM-DUMP-INSPECT</h1>
+    <button type="button" id="theme-toggle"></button>
+  </div>
+  <p id="meta" class="muted"></p>
+</header>
+
+<section class="panel">
+  <h2>Alerts</h2>
+  <ul id="alerts" class="alerts"></ul>
+</section>
+
+<section class="panel">
+  <h2>Dump</h2>
+  <dl id="dump" class="kv"></dl>
+</section>
+
+<section class="panel" id="coverage-panel">
+  <h2>Coverage <span class="muted">- what each service has, over time</span></h2>
+  <div class="legend" id="coverage-legend"></div>
+  <div class="chart" id="coverage"></div>
+</section>
+
+<section class="panel" id="services-panel">
+  <h2>Metrics <span class="muted" id="vm-sub"></span></h2>
+  <div class="table-wrap"><table id="services"></table></div>
+</section>
+
+<section class="panel" id="qan-panel">
+  <h2>QAN <span class="muted" id="qan-sub"></span></h2>
+  <div class="table-wrap"><table id="qan"></table></div>
+</section>
+
+<section class="panel" id="chunks-panel">
+  <h2>Samples per chunk <span class="muted">- a drop means less data collected in that window</span></h2>
+  <div class="chart" id="chunks"></div>
+</section>
+
+<section class="panel">
+  <h2>Export log <span class="muted" id="log-sub"></span></h2>
+  <div class="table-wrap"><pre class="log" id="log"></pre></div>
+</section>
+
+<section class="panel">
+  <h2>Export command <span class="muted">- secrets masked, repeated values once</span></h2>
+  <div class="table-wrap"><pre class="log" id="cmd"></pre></div>
+</section>
+
+<div id="tooltip" class="tooltip" hidden></div>
+<script id="data" type="application/json">{{DATA}}</script>
+<script>{{JS}}</script>
+</body>
+</html>
