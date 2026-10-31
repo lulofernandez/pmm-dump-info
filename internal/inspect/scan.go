@@ -139,7 +139,10 @@ func logText(e map[string]any) string {
 
 // ---- vm/ chunks ----
 
-type svcKey struct{ service, node string }
+type svcKey struct {
+	service, node string
+	internal      bool // PMM Server's own components (instance="pmm-server", no node/service)
+}
 
 type svcAcc struct {
 	Service
@@ -264,11 +267,17 @@ func parseChunk(c *Chunk, data []byte) ([]rec, bool, error) {
 		n, lo, hi := scanTimestamps(ts)
 		c.Lines++
 		c.Samples += n
-		k := svcKey{labels["service_name"], labels["node_name"]}
+		k := svcKey{service: labels["service_name"], node: labels["node_name"]}
 		if k.service != "" {
 			k.node = "" // a service is one row even if its node label varies
 		}
-		recs = append(recs, rec{k, labels["service_type"], labels["node_name"], family(labels["__name__"]), hashLabels(labels), n, lo, hi})
+		fam := family(labels["__name__"])
+		if k.service == "" && k.node == "" && labels["instance"] == "pmm-server" {
+			// PMM scraping its own components (grafana, clickhouse, victoriametrics...): one row, by job
+			k.internal = true
+			fam = labels["job"]
+		}
+		recs = append(recs, rec{k, labels["service_type"], labels["node_name"], fam, hashLabels(labels), n, lo, hi})
 	}
 	return recs, false, sc.Err()
 }
@@ -343,7 +352,9 @@ func (v *vmScanner) addSeries(chunk int, r rec) {
 		a = &svcAcc{series: map[uint64]bool{}, coverage: map[int]int64{}}
 		a.Families = map[string]int{}
 		a.Name, a.Node = r.key.service, r.node
-		if r.key.service == "" {
+		if r.key.internal {
+			a.Name, a.Kind = "PMM Server internals", "pmm-server"
+		} else if r.key.service == "" {
 			a.Name, a.Kind = r.node, "node"
 			if a.Name == "" {
 				a.Name = "(no service/node label)"
@@ -412,10 +423,22 @@ func (v *vmScanner) summary(format string) VMSummary {
 		}
 		s.Services = append(s.Services, a.Service)
 	}
+	// nodes first, then services, then PMM Server internals and the series without service/node label
+	rank := func(a Service) int {
+		switch {
+		case a.Kind == "node" && a.Node == "":
+			return 3
+		case a.Kind == "pmm-server":
+			return 2
+		case a.Kind == "node":
+			return 0
+		}
+		return 1
+	}
 	sort.Slice(s.Services, func(i, j int) bool {
 		x, y := s.Services[i], s.Services[j]
-		if (x.Kind == "node") != (y.Kind == "node") {
-			return y.Kind == "node" // services first, then nodes
+		if rx, ry := rank(x), rank(y); rx != ry {
+			return rx < ry
 		}
 		return x.Name < y.Name
 	})

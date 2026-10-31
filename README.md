@@ -66,9 +66,7 @@ Installs `~/Applications/pmm-dump-info.app`. Right-click a dump > Open With > pm
 
 ```
 pmm-dump-info [flags] <pmm-dump.tar.gz>
-  -html          write the HTML report (<dump>.html next to the dump) instead of text
-  -o <file>      HTML output file (implies -html)
-  -open          write the HTML report and open it (implies -html)
+  -open          write the HTML report (<dump>.html next to the dump) and open it in the browser
   -quick         only meta.json, log.json and the file list; do not read chunk contents
   -j <n>         chunks parsed in parallel (default 4; keep it low on shared hosts)
   -pass <pass>   password of an encrypted dump (also env PMM_DUMP_PASS)
@@ -77,4 +75,4 @@ pmm-dump-info [flags] <pmm-dump.tar.gz>
 
 Exit codes: 0 OK, 1 error, 2 usage, 3 unknown QAN column layout (see QAN columns).
 
-Without flags it prints the text report. `-quick` answers versions, arguments and "is there QAN" in seconds; the full read of a 600 MB dump takes about 20 s with `-j 4`.
+Without flags it prints the text report, the one to use on the lab hosts. `-open` is for the Mac (the Finder app uses it). `-quick` answers versions, arguments and "is there QAN" in seconds; the full read of a 600 MB dump takes about 20 s with `-j 4`.

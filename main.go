@@ -18,9 +18,7 @@ import (
 )
 
 func main() {
-	html := flag.Bool("html", false, "write the HTML report (default <dump>.html next to the dump) instead of text")
-	out := flag.String("o", "", "output HTML file (implies -html)")
-	open := flag.Bool("open", false, "write the HTML report and open it (implies -html)")
+	open := flag.Bool("open", false, "write the HTML report (<dump>.html next to the dump) and open it in the browser instead of text")
 	quick := flag.Bool("quick", false, "only meta.json, log.json and the file list; do not read chunk contents")
 	skipQAN := flag.Bool("skip-qan", false, "do not read the QAN rows (ch/), e.g. when their column layout is unknown")
 	pass := flag.String("pass", "", "password of an encrypted dump (also env PMM_DUMP_PASS)")
@@ -38,10 +36,6 @@ func main() {
 	if *pass == "" {
 		*pass = os.Getenv("PMM_DUMP_PASS")
 	}
-	if *out != "" || *open {
-		*html = true
-	}
-
 	t0 := time.Now()
 	r, err := inspect.Scan(in, *pass, !*quick, *skipQAN, *workers)
 	var qe *inspect.QANSchemaError
@@ -53,15 +47,13 @@ func main() {
 		fail(err)
 	}
 
-	if !*html {
+	if !*open {
 		report.WriteText(os.Stdout, r)
 		return
 	}
-	if *out == "" {
-		*out = strings.TrimSuffix(in, ".gz")
-		*out = strings.TrimSuffix(*out, ".tar") + ".html"
-	}
-	f, err := os.Create(*out)
+	out := strings.TrimSuffix(in, ".gz")
+	out = strings.TrimSuffix(out, ".tar") + ".html"
+	f, err := os.Create(out)
 	if err != nil {
 		fail(err)
 	}
@@ -73,16 +65,14 @@ func main() {
 		fail(err)
 	}
 	fmt.Fprintf(os.Stderr, "%d vm chunks, %d services, %d QAN rows in %s -> %s\n",
-		len(r.VM.Chunks), len(r.VM.Services), r.QAN.Rows, time.Since(t0).Round(time.Second), *out)
+		len(r.VM.Chunks), len(r.VM.Services), r.QAN.Rows, time.Since(t0).Round(time.Second), out)
 
-	if *open {
-		cmd := "xdg-open"
-		if runtime.GOOS == "darwin" {
-			cmd = "open"
-		}
-		if err := exec.Command(cmd, *out).Start(); err != nil {
-			fail(err)
-		}
+	cmd := "xdg-open"
+	if runtime.GOOS == "darwin" {
+		cmd = "open"
+	}
+	if err := exec.Command(cmd, out).Start(); err != nil {
+		fail(err)
 	}
 }
 

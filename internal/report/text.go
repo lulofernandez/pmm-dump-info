@@ -119,7 +119,7 @@ func WriteText(w io.Writer, r *inspect.Result) {
 	if len(r.Other) > 0 {
 		p("\nOther files: %s\n", strings.Join(r.Other, ", "))
 	}
-	p("\nExport command (secrets masked, repeated flags once):\n  %s\n", r.Args.Masked)
+	p("\nExport command:\n  %s\n", r.Args.Masked)
 }
 
 func families(f map[string]int, top int) string {

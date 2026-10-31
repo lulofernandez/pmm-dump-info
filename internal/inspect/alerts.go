@@ -104,7 +104,7 @@ func alerts(r *Result) []Alert {
 			have[q.Name] = true
 		}
 		for _, s := range r.VM.Services {
-			if s.Kind != "node" && s.Kind != "-" && s.Name != "pmm-server-postgresql" && !have[s.Name] {
+			if s.Kind != "node" && s.Kind != "-" && s.Kind != "pmm-server" && s.Name != "pmm-server-postgresql" && !have[s.Name] {
 				info("%s %s has metrics but no QAN", s.Kind, s.Name)
 			}
 		}

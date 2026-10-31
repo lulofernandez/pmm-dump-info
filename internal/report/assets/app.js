@@ -188,6 +188,7 @@
   for (const q of qan.services || []) qanBy[q.name] = q;
 
   function badge(text, cls) { return el("span", { class: "badge " + (cls || "") }, text); }
+  const noQAN = (k) => k === "node" || k === "pmm-server"; // nodes and PMM Server internals have no QAN
   function famText(f) {
     return Object.entries(f || {}).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
       .map(([k, v]) => k + " " + v).join(", ");
@@ -213,7 +214,7 @@
       { title: "Series", value: (s) => s.series, render: (s) => fmtCount(s.series), num: true },
       { title: "Samples", value: (s) => s.samples, render: (s) => fmtCount(s.samples), num: true },
       { title: "QAN", value: (s) => (qanBy[s.name] ? qanBy[s.name].rows : -1),
-        render: (s) => s.kind === "node" ? "" : qanBy[s.name] ? badge(fmtCount(qanBy[s.name].rows) + " rows") : badge(hasQAN ? "none" : "-", hasQAN ? "no" : "node") },
+        render: (s) => noQAN(s.kind) ? "" : qanBy[s.name] ? badge(fmtCount(qanBy[s.name].rows) + " rows") : badge(hasQAN ? "none" : "-", hasQAN ? "no" : "node") },
       { title: "Metric families (distinct series)", value: (s) => famText(s.families), cls: "fam" },
     ], services.slice(), "No series in the vm/ chunks.");
   })();
@@ -300,8 +301,8 @@
 
     // rows: every service with metrics, then QAN-only services
     const rows = [];
-    for (const s of vm.services || []) rows.push({ name: s.name, kind: s.kind, vm: s, qan: s.kind === "node" ? null : qanBy[s.name] });
-    for (const q of qan.services || []) if (!rows.some((r) => r.name === q.name && r.kind !== "node")) rows.push({ name: q.name, kind: q.kind || "-", qan: q });
+    for (const s of vm.services || []) rows.push({ name: s.name, kind: s.kind, vm: s, qan: noQAN(s.kind) ? null : qanBy[s.name] });
+    for (const q of qan.services || []) if (!rows.some((r) => r.name === q.name && !noQAN(r.kind))) rows.push({ name: q.name, kind: q.kind || "-", qan: q });
 
     const labelW = Math.min(300, 40 + Math.max(...rows.map((r) => (r.name.length + r.kind.length + 3) * 6.6)));
     const W = Math.max(box.clientWidth - 18, labelW + 300), rowH = 26, top = 4, plotW = W - labelW - 12;
@@ -367,7 +368,7 @@
           let n = 0;
           for (const k in r.qan.buckets) if (Math.abs(Number(k) - t) < 300000) n += r.qan.buckets[k];
           lines.push("QAN: " + fmtCount(n) + " rows within 5 min");
-        } else if (r.kind !== "node" && (qan.services || []).length) {
+        } else if (!noQAN(r.kind) && (qan.services || []).length) {
           lines.push("QAN: none for this service");
         }
         showTip(ev, r.name + " · " + fmtTime(t), lines);
