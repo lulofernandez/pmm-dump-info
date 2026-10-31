@@ -106,6 +106,7 @@ func WriteText(w io.Writer, r *inspect.Result) {
 		p("\n")
 	}
 
+	p("\nExport command:\n  %s\n", r.Args.Masked)
 	if r.Log.Present {
 		p("\nExport log (log.json): %d lines, %s -> %s, levels %s\n", r.Log.Lines, orDash(r.Log.First), orDash(r.Log.Last), levels(r.Log.Levels))
 		for i, l := range r.Log.Notable {
@@ -119,7 +120,6 @@ func WriteText(w io.Writer, r *inspect.Result) {
 	if len(r.Other) > 0 {
 		p("\nOther files: %s\n", strings.Join(r.Other, ", "))
 	}
-	p("\nExport command:\n  %s\n", r.Args.Masked)
 }
 
 func families(f map[string]int, top int) string {
