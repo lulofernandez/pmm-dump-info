@@ -97,13 +97,14 @@ func alerts(r *Result) []Alert {
 	}
 
 	// services with metrics but no QAN, when there is QAN
+	// (pmm-server-postgresql is PMM's own database, it never has QAN)
 	if r.Deep && len(r.QAN.Services) > 0 {
 		have := map[string]bool{}
 		for _, q := range r.QAN.Services {
 			have[q.Name] = true
 		}
 		for _, s := range r.VM.Services {
-			if s.Kind != "node" && s.Kind != "-" && !have[s.Name] {
+			if s.Kind != "node" && s.Kind != "-" && s.Name != "pmm-server-postgresql" && !have[s.Name] {
 				info("%s %s has metrics but no QAN", s.Kind, s.Name)
 			}
 		}

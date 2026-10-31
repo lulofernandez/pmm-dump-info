@@ -19,7 +19,7 @@ func WriteText(w io.Writer, r *inspect.Result) {
 	p := func(f string, a ...any) { fmt.Fprintf(w, f, a...) }
 	m := r.Meta
 
-	p("PMM-DUMP-INSPECT  %s (%s)\n\n", filepath.Base(r.File), bytesStr(r.Size))
+	p("PMM-DUMP-INFO  %s (%s)\n\n", filepath.Base(r.File), bytesStr(r.Size))
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	row := func(k, v string) { fmt.Fprintf(tw, "  %s\t%s\n", k, v) }
