@@ -23,12 +23,18 @@ func main() {
 	skipQAN := flag.Bool("skip-qan", false, "do not read the QAN rows (ch/), e.g. when their column layout is unknown")
 	pass := flag.String("pass", "", "password of an encrypted dump (also env PMM_DUMP_PASS)")
 	workers := flag.Int("j", 4, "chunks parsed in parallel (keep it low on shared hosts)")
+	color := flag.String("color", "auto", "colors in the text report: auto (terminal and no NO_COLOR), always, never")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: pmm-dump-info [flags] <pmm-dump.tar.gz>\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 	if flag.NArg() != 1 {
+		flag.Usage()
+		os.Exit(2)
+	}
+	useColor, ok := colorMode(*color)
+	if !ok {
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -48,7 +54,7 @@ func main() {
 	}
 
 	if !*open {
-		report.WriteText(os.Stdout, r)
+		report.WriteText(os.Stdout, r, useColor)
 		return
 	}
 	out := strings.TrimSuffix(in, ".gz")
@@ -74,6 +80,22 @@ func main() {
 	if err := exec.Command(cmd, out).Start(); err != nil {
 		fail(err)
 	}
+}
+
+// colorMode resolves -color: auto is on when stdout is a terminal, NO_COLOR is
+// unset and TERM is not dumb.
+func colorMode(mode string) (on, ok bool) {
+	switch mode {
+	case "always":
+		return true, true
+	case "never":
+		return false, true
+	case "auto":
+		fi, err := os.Stdout.Stat()
+		return err == nil && fi.Mode()&os.ModeCharDevice != 0 &&
+			os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb", true
+	}
+	return false, false
 }
 
 func fail(err error) {

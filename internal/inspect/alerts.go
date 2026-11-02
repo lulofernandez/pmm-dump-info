@@ -60,15 +60,22 @@ func alerts(r *Result) []Alert {
 	// --instance filters with nothing behind them
 	if r.Deep && r.VM.Format == "json" {
 		for _, in := range r.Args.Instances {
-			found := false
+			found, nodeOfService, nodeRow := false, false, false
 			for _, s := range r.VM.Services {
-				if s.Name == in || s.Node == in {
+				switch {
+				case s.Kind == "node" && s.Name == in:
+					found, nodeRow = true, true
+				case s.Name == in:
 					found = true
-					break
+				case s.Node == in:
+					found, nodeOfService = true, true
 				}
 			}
-			if !found {
+			switch {
+			case !found:
 				warn("--instance=%s was requested but there are no metrics for it", in)
+			case nodeOfService && !nodeRow:
+				warn("--instance=%s is a node, but the dump has no node metrics for it (no OS metrics)", in)
 			}
 		}
 	}

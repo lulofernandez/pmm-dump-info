@@ -8,22 +8,23 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"pmm-dump-info/internal/inspect"
 )
 
-// WriteText prints the report for a terminal.
-func WriteText(w io.Writer, r *inspect.Result) {
+// WriteText prints the report for a terminal; color adds ANSI styles to the
+// titles, column headers and alerts.
+func WriteText(w io.Writer, r *inspect.Result, color bool) {
 	p := func(f string, a ...any) { fmt.Fprintf(w, f, a...) }
+	c := palette{color}
 	m := r.Meta
 
-	p("PMM-DUMP-INFO  %s (%s)\n\n", filepath.Base(r.File), bytesStr(r.Size))
+	p("\n%s  %s (%s)\n\n", c.paint(styleTitle, "PMM-DUMP-INFO"), filepath.Base(r.File), bytesStr(r.Size))
 
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	row := func(k, v string) { fmt.Fprintf(tw, "  %s\t%s\n", k, v) }
-	p("Dump\n")
+	var kv [][]string
+	row := func(k, v string) { kv = append(kv, []string{k, v}) }
+	p("%s\n", c.paint(styleTitle, "Dump"))
 	row("pmm-dump", m.Version.GitBranch+"@"+m.Version.GitCommit)
 	row("PMM Server", m.PMMServerVersion)
 	row("Exported from", r.Args.Source)
@@ -55,21 +56,21 @@ func WriteText(w io.Writer, r *inspect.Result) {
 		}
 		row("Services in meta", strings.Join(names, ", "))
 	}
-	tw.Flush()
+	table(w, c, false, true, kv)
 
 	if len(r.Alerts) > 0 {
-		p("\nAlerts\n")
+		p("\n%s\n", c.paint(styleTitle, "Alerts"))
 		for _, a := range r.Alerts {
-			mark := "i"
 			if a.Level == "warn" {
-				mark = "!"
+				p("  %s %s\n", c.paint(styleWarn, "!"), a.Text)
+			} else {
+				p("  %s %s\n", c.paint(styleInfo, "i"), a.Text)
 			}
-			p("  %s %s\n", mark, a.Text)
 		}
 	}
 
 	vm := r.VM
-	p("\nMetrics (vm/): %d chunks, %s", len(vm.Chunks), bytesStr(vm.Bytes))
+	p("\n%s %d chunks, %s", c.paint(styleTitle, "Metrics (vm/):"), len(vm.Chunks), bytesStr(vm.Bytes))
 	if len(vm.Chunks) > 0 {
 		p(", chunks cover %s -> %s", fmtTime(vm.Chunks[0].Start), fmtTime(vm.Chunks[len(vm.Chunks)-1].End))
 	}
@@ -77,38 +78,41 @@ func WriteText(w io.Writer, r *inspect.Result) {
 	if r.Deep && vm.Format == "json" && len(vm.Chunks) > 0 {
 		p("  real data %s -> %s, %s samples, %s distinct series\n\n",
 			fmtTime(vm.First), fmtTime(vm.Last), countStr(vm.Samples), countStr(int64(vm.Series)))
-		tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "  SERVICE\tTYPE\tNODE\tFIRST\tLAST\tSERIES\tSAMPLES\tMETRIC FAMILIES")
+		rows := [][]string{{"SERVICE", "TYPE", "NODE", "FIRST", "LAST", "SERIES", "SAMPLES", "METRIC FAMILIES"}}
 		for _, s := range vm.Services {
-			fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.Name, s.Kind, s.Node,
-				fmtTime(s.First), fmtTime(s.Last), countStr(int64(s.Series)), countStr(s.Samples), families(s.Families, 5))
+			rows = append(rows, []string{s.Name, s.Kind, s.Node,
+				fmtTime(s.First), fmtTime(s.Last), countStr(int64(s.Series)), countStr(s.Samples), families(s.Families, 5)})
 		}
-		tw.Flush()
+		table(w, c, true, false, rows)
 	} else if !r.Deep {
 		p("  (quick mode: chunk contents not read; use -deep for services and real range)\n")
 	}
 
 	q := r.QAN
-	p("\nQAN (ch/): %d files, %s", len(q.Files), bytesStr(q.Bytes))
+	p("\n%s %d files, %s", c.paint(styleTitle, "QAN (ch/):"), len(q.Files), bytesStr(q.Bytes))
 	if r.Deep && len(q.Files) > 0 {
 		p(", %s rows, %s -> %s\n  %s\n", countStr(q.Rows), fmtTime(q.First), fmtTime(q.Last), q.Schema)
 		if len(q.Services) > 0 {
 			p("\n")
-			tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(tw, "  SERVICE\tTYPE\tNODE\tFIRST\tLAST\tROWS\tQUERIES")
+			rows := [][]string{{"SERVICE", "TYPE", "NODE", "FIRST", "LAST", "ROWS", "QUERIES"}}
 			for _, s := range q.Services {
-				fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\t%s\t%s\t%d\n", s.Name, orDash(s.Kind), orDash(s.Node),
-					fmtTime(s.First), fmtTime(s.Last), countStr(s.Rows), s.Queries)
+				rows = append(rows, []string{s.Name, orDash(s.Kind), orDash(s.Node),
+					fmtTime(s.First), fmtTime(s.Last), countStr(s.Rows), fmt.Sprint(s.Queries)})
 			}
-			tw.Flush()
+			table(w, c, true, false, rows)
 		}
 	} else {
 		p("\n")
 	}
 
-	p("\nExport command:\n  %s\n", r.Args.Masked)
+	p("\n%s\n  %s\n", c.paint(styleTitle, "Export command:"), r.Args.Masked)
 	if r.Log.Present {
-		p("\nExport log (log.json): %d lines, %s -> %s, levels %s\n", r.Log.Lines, orDash(r.Log.First), orDash(r.Log.Last), levels(r.Log.Levels))
+		p("\n%s %d lines, %s -> %s%s, levels %s", c.paint(styleTitle, "Export log (log.json):"), r.Log.Lines, orDash(r.Log.First), orDash(r.Log.Last), logDuration(r.Log.First, r.Log.Last), levels(r.Log.Levels))
+		if len(r.Log.Notable) == 0 {
+			p(", no warnings or errors\n")
+		} else {
+			p("\n")
+		}
 		for i, l := range r.Log.Notable {
 			if i == 15 {
 				p("  ... %d more in the HTML report\n", len(r.Log.Notable)-15)
@@ -118,7 +122,7 @@ func WriteText(w io.Writer, r *inspect.Result) {
 		}
 	}
 	if len(r.Other) > 0 {
-		p("\nOther files: %s\n", strings.Join(r.Other, ", "))
+		p("\n%s %s\n", c.paint(styleTitle, "Other files:"), strings.Join(r.Other, ", "))
 	}
 }
 
@@ -197,6 +201,16 @@ func orDash(s string) string {
 		return "-"
 	}
 	return s
+}
+
+// logDuration is " (3s)" between two RFC 3339 times, or "" when they do not parse.
+func logDuration(first, last string) string {
+	a, err1 := time.Parse(time.RFC3339, first)
+	b, err2 := time.Parse(time.RFC3339, last)
+	if err1 != nil || err2 != nil {
+		return ""
+	}
+	return " (" + b.Sub(a).Round(time.Second).String() + ")"
 }
 
 func clip(s string, n int) string {

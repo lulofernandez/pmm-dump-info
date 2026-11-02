@@ -71,8 +71,15 @@ pmm-dump-info [flags] <pmm-dump.tar.gz>
   -j <n>         chunks parsed in parallel (default 4; keep it low on shared hosts)
   -pass <pass>   password of an encrypted dump (also env PMM_DUMP_PASS)
   -skip-qan      do not read the QAN rows (ch/), e.g. when their column layout is unknown
+  -color <mode>  colors in the text report: auto (default: terminal and no NO_COLOR), always (e.g. for less -R), never
 ```
 
 Exit codes: 0 OK, 1 error, 2 usage, 3 unknown QAN column layout (see QAN columns).
 
 Without flags it prints the text report, the one to use on the lab hosts. `-open` is for the Mac (the Finder app uses it). `-quick` answers versions, arguments and "is there QAN" in seconds; the full read of a 600 MB dump takes about 20 s with `-j 4`.
+
+The report shows only the warnings and errors of `log.json`. To read the whole export log:
+
+```
+tar xOzf <dump.tar.gz> log.json | jq -r '"\(.time) \(.level) \(.message)"'
+```

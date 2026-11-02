@@ -73,3 +73,29 @@ func TestScanTimestamps(t *testing.T) {
 		t.Errorf("empty array: %d", n)
 	}
 }
+
+func TestInstanceNodeWithoutNodeMetrics(t *testing.T) {
+	r := &Result{Deep: true}
+	r.VM.Format = "json"
+	r.Args.Instances = []string{"db1-postgresql", "db1", "db2"}
+	r.VM.Services = []Service{{Name: "db1-postgresql", Kind: "postgresql", Node: "db1"}}
+	var got []string
+	for _, a := range alerts(r) {
+		if strings.Contains(a.Text, "--instance") {
+			got = append(got, a.Text)
+		}
+	}
+	want := []string{
+		"--instance=db1 is a node, but the dump has no node metrics for it (no OS metrics)",
+		"--instance=db2 was requested but there are no metrics for it",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("alerts = %q", got)
+	}
+	r.VM.Services = append(r.VM.Services, Service{Name: "db1", Kind: "node", Node: "db1"})
+	for _, a := range alerts(r) {
+		if strings.Contains(a.Text, "db1 is a node") {
+			t.Errorf("unexpected alert with node metrics present: %s", a.Text)
+		}
+	}
+}

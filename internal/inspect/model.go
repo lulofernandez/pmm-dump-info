@@ -67,7 +67,7 @@ type LogSummary struct {
 	CHRows  *int64         `json:"chRows,omitempty"`  // "Split Click House rows into chunks"
 	First   string         `json:"first,omitempty"`   // time of the first line
 	Last    string         `json:"last,omitempty"`    // time of the last line
-	Notable []string       `json:"notable,omitempty"` // warn/error lines and QAN lines
+	Notable []string       `json:"notable,omitempty"` // warn/error lines
 }
 
 // VMSummary covers the vm/ chunks (VictoriaMetrics export).

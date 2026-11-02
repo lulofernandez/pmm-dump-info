@@ -107,8 +107,7 @@ func readLog(rd io.Reader) LogSummary {
 				ls.CHRows = &n
 			}
 		}
-		notable := level == "warn" || level == "error" || level == "fatal" || level == "panic" ||
-			strings.Contains(msg, "Click House") || strings.Contains(msg, "ClickHouse")
+		notable := level == "warn" || level == "error" || level == "fatal" || level == "panic"
 		if notable && !seen[level+msg] && len(ls.Notable) < 50 {
 			seen[level+msg] = true
 			ls.Notable = append(ls.Notable, fmt.Sprintf("%s %s %s", t, strings.ToUpper(level), logText(e)))
