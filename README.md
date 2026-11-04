@@ -65,7 +65,7 @@ Installs `~/Applications/pmm-dump-info.app`. Right-click a dump > Open With > pm
 ## Use
 
 ```
-pmm-dump-info [flags] <pmm-dump.tar.gz>
+pmm-dump-info [flags] <pmm-dump.tar.gz | .zip with dumps>
   -open          write the HTML report (<dump>.html next to the dump) and open it in the browser
   -quick         only meta.json, log.json and the file list; do not read chunk contents
   -j <n>         chunks parsed in parallel (default 4; keep it low on shared hosts)
@@ -76,7 +76,9 @@ pmm-dump-info [flags] <pmm-dump.tar.gz>
 
 Exit codes: 0 OK, 1 error, 2 usage, 3 unknown QAN column layout (see QAN columns).
 
-Without flags it prints the text report, the one to use on the lab hosts. `-open` is for the Mac (the Finder app uses it). `-quick` answers versions, arguments and "is there QAN" in seconds; the full read of a 600 MB dump takes about 20 s with `-j 4`.
+Without flags it prints the text report, the one to use on the lab hosts. `-open` is for the Mac (the Finder app uses it). `-quick` answers versions, arguments and "is there QAN" without reading the chunks, but it still decompresses the whole file: about 1 minute for 3 GB and 2 minutes for 9 GB. The full read takes about 40 s for 600 MB with `-j 4`. With `-quick` the report says which checks it skipped.
+
+A `.zip` (customers upload several PMM UI dumps in one) is read in place, without extracting it: one report per file inside, `__MACOSX/` and `._*` skipped, and a file that fails does not stop the others (the exit code is the worst one). With `-open` each dump gets its own `<zip>_<file>.html`. Reading from a zip runs at about 9 MB/s.
 
 The report shows only the warnings and errors of `log.json`. To read the whole export log:
 

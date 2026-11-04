@@ -22,6 +22,11 @@ func alerts(r *Result) []Alert {
 	warn := func(f string, a ...any) { out = append(out, Alert{"warn", fmt.Sprintf(f, a...)}) }
 	info := func(f string, a ...any) { out = append(out, Alert{"info", fmt.Sprintf(f, a...)}) }
 
+	if !r.Deep {
+		info("-quick: chunk contents not read, so services, samples, QAN rows and the alerts based on them " +
+			"(no samples, up/scrape only, --instance without metrics, gaps, real range) are not checked")
+	}
+
 	// QAN
 	switch {
 	case r.Args.DumpQAN && len(r.QAN.Files) == 0:

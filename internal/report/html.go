@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"html"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"pmm-dump-info/internal/inspect"
@@ -35,7 +34,7 @@ func WriteHTML(w io.Writer, r *inspect.Result) error {
 		return err
 	}
 	out := strings.NewReplacer(
-		"{{TITLE}}", html.EscapeString(filepath.Base(r.File)),
+		"{{TITLE}}", html.EscapeString(r.Name),
 		"{{CSS}}", string(css),
 		"{{JS}}", string(js),
 		"{{DATA}}", string(data),

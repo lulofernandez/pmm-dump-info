@@ -1,9 +1,11 @@
 // Package dump opens a pmm-dump file: gzip-compressed tar, optionally
-// encrypted with openssl-compatible AES-256-CTR (pmm-dump --encryption).
+// encrypted with openssl-compatible AES-256-CTR (pmm-dump --encryption),
+// on its own or inside a .zip that customers use to upload several dumps.
 package dump
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"compress/gzip"
@@ -15,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // ErrEncrypted is returned when the file is encrypted and no password was given.
@@ -30,7 +33,7 @@ const (
 type File struct {
 	Tar       *tar.Reader
 	Encrypted bool
-	f         *os.File
+	f         io.Closer
 	gz        *gzip.Reader
 }
 
@@ -40,6 +43,49 @@ func Open(path, pass string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+	return open(f, path, pass)
+}
+
+// IsZip tells whether path is a zip archive (local file header magic).
+func IsZip(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	head := make([]byte, 4)
+	_, err = io.ReadFull(f, head)
+	return err == nil && bytes.Equal(head, []byte("PK\x03\x04"))
+}
+
+// ZipMembers opens a zip and returns its regular files, without directories
+// and the macOS metadata a zip made in Finder carries (__MACOSX/, ._*).
+func ZipMembers(path string) (*zip.ReadCloser, []*zip.File, error) {
+	z, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	var out []*zip.File
+	for _, m := range z.File {
+		base := m.Name[strings.LastIndex(m.Name, "/")+1:]
+		if m.FileInfo().IsDir() || strings.HasPrefix(m.Name, "__MACOSX/") || strings.HasPrefix(base, "._") {
+			continue
+		}
+		out = append(out, m)
+	}
+	return z, out, nil
+}
+
+// OpenZipMember opens one dump stored in a zip; nothing is extracted to disk.
+func OpenZipMember(m *zip.File, pass string) (*File, error) {
+	rc, err := m.Open()
+	if err != nil {
+		return nil, err
+	}
+	return open(rc, m.Name, pass)
+}
+
+func open(f io.ReadCloser, path, pass string) (*File, error) {
 	br := bufio.NewReaderSize(f, 1<<20)
 	head, err := br.Peek(16)
 	if err != nil {

@@ -5,7 +5,6 @@ package report
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -20,7 +19,7 @@ func WriteText(w io.Writer, r *inspect.Result, color bool) {
 	c := palette{color}
 	m := r.Meta
 
-	p("\n%s  %s (%s)\n\n", c.paint(styleTitle, "PMM-DUMP-INFO"), filepath.Base(r.File), bytesStr(r.Size))
+	p("\n%s  %s (%s)\n\n", c.paint(styleTitle, "PMM-DUMP-INFO"), r.Name, bytesStr(r.Size))
 
 	var kv [][]string
 	row := func(k, v string) { kv = append(kv, []string{k, v}) }

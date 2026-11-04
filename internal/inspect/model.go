@@ -5,6 +5,8 @@ package inspect
 // Result is everything the reports show. Times are Unix milliseconds.
 type Result struct {
 	File      string `json:"file"`
+	Member    string `json:"member,omitempty"` // path inside the zip, when File is a zip
+	Name      string `json:"name"`             // shown in the reports: file, or zip > member
 	Size      int64  `json:"size"`
 	Encrypted bool   `json:"encrypted"`
 	Deep      bool   `json:"deep"` // chunk contents were read

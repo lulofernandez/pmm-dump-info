@@ -63,7 +63,7 @@
   const vmDecoded = D.deep && vm.format === "json";
   (function () {
     const m = $("meta");
-    m.appendChild(el("span", { class: "file" }, D.file.split("/").pop()));
+    m.appendChild(el("span", { class: "file" }, D.name));
     const parts = [fmtBytes(D.size), "PMM " + meta["pmm-server-version"], args.source];
     if (D.encrypted) parts.push("encrypted");
     if (!D.deep) parts.push("quick mode: chunk contents not read");

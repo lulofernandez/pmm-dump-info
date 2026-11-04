@@ -30,10 +30,49 @@ func Scan(file, pass string, deep, skipQAN bool, workers int) (*Result, error) {
 	}
 	defer d.Close()
 
-	r := &Result{File: file, Encrypted: d.Encrypted, Deep: deep}
+	r := &Result{File: file, Name: path.Base(file), Encrypted: d.Encrypted, Deep: deep}
 	if st, err := os.Stat(file); err == nil {
 		r.Size = st.Size()
 	}
+	return scan(d, r, file, skipQAN, workers)
+}
+
+// ZipEntry is the result, or the error, of one file inside a zip.
+type ZipEntry struct {
+	Name   string
+	Result *Result
+	Err    error
+}
+
+// ScanZip scans every file inside a zip as a dump, one after the other,
+// reading each straight from the archive.
+func ScanZip(file, pass string, deep, skipQAN bool, workers int) ([]ZipEntry, error) {
+	z, members, err := dump.ZipMembers(file)
+	if err != nil {
+		return nil, err
+	}
+	defer z.Close()
+	if len(members) == 0 {
+		return nil, fmt.Errorf("%s: the zip holds no files", file)
+	}
+	var out []ZipEntry
+	for _, m := range members {
+		e := ZipEntry{Name: m.Name}
+		d, err := dump.OpenZipMember(m, pass)
+		if err == nil {
+			r := &Result{File: file, Member: m.Name, Name: path.Base(file) + " > " + m.Name,
+				Size: int64(m.UncompressedSize64), Encrypted: d.Encrypted, Deep: deep}
+			e.Result, err = scan(d, r, file+" > "+m.Name, skipQAN, workers)
+			d.Close()
+		}
+		e.Err = err
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+func scan(d *dump.File, r *Result, file string, skipQAN bool, workers int) (*Result, error) {
+	deep := r.Deep
 	vm := newVMScanner(workers)
 	qan := newQANScanner()
 	for {
@@ -72,6 +111,7 @@ func Scan(file, pass string, deep, skipQAN bool, workers int) (*Result, error) {
 	r.Args = ParseArgs(r.Meta.Arguments)
 	r.PMMDump = pmmDumpVersion(r.Meta)
 	r.VM = vm.summary(r.Meta.VMDataFormat)
+	var err error
 	if r.QAN, err = qan.summary(r.Meta.PMMServerVersion); err != nil {
 		return nil, err
 	}

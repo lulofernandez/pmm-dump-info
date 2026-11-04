@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
+	"pmm-dump-info/internal/dump"
 	"pmm-dump-info/internal/inspect"
 	"pmm-dump-info/internal/report"
 )
@@ -25,7 +28,7 @@ func main() {
 	workers := flag.Int("j", 4, "chunks parsed in parallel (keep it low on shared hosts)")
 	color := flag.String("color", "auto", "colors in the text report: auto (terminal and no NO_COLOR), always, never")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: pmm-dump-info [flags] <pmm-dump.tar.gz>\n")
+		fmt.Fprintf(os.Stderr, "usage: pmm-dump-info [flags] <pmm-dump.tar.gz | .zip with dumps>\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -42,33 +45,84 @@ func main() {
 	if *pass == "" {
 		*pass = os.Getenv("PMM_DUMP_PASS")
 	}
+	if dump.IsZip(in) {
+		os.Exit(runZip(in, *pass, !*quick, *skipQAN, *workers, *open, useColor))
+	}
 	t0 := time.Now()
 	r, err := inspect.Scan(in, *pass, !*quick, *skipQAN, *workers)
-	var qe *inspect.QANSchemaError
-	if errors.As(err, &qe) {
-		fmt.Fprintln(os.Stderr, "pmm-dump-info:", err)
-		os.Exit(3)
+	if code := scanError(err); code != 0 {
+		os.Exit(code)
 	}
-	if err != nil {
-		fail(err)
-	}
-
 	if !*open {
 		report.WriteText(os.Stdout, r, useColor)
 		return
 	}
 	out := strings.TrimSuffix(in, ".gz")
 	out = strings.TrimSuffix(out, ".tar") + ".html"
+	if err := writeHTML(r, out, t0); err != nil {
+		fail(err)
+	}
+}
+
+// runZip reports every dump inside a zip, one after the other, and goes on
+// when one fails. The exit code is the worst one: 3 for an unknown QAN
+// layout, 1 for any other error.
+func runZip(in, pass string, deep, skipQAN bool, workers int, open, useColor bool) int {
+	entries, err := inspect.ScanZip(in, pass, deep, skipQAN, workers)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "pmm-dump-info:", err)
+		return 1
+	}
+	if !open {
+		fmt.Printf("\n%s: %d files\n", filepath.Base(in), len(entries))
+	}
+	worst := 0
+	for _, e := range entries {
+		t0 := time.Now()
+		if e.Err != nil {
+			code := scanError(fmt.Errorf("%s > %s: %w", filepath.Base(in), e.Name, e.Err))
+			worst = max(worst, code)
+			continue
+		}
+		if !open {
+			report.WriteText(os.Stdout, e.Result, useColor)
+			continue
+		}
+		member := strings.TrimSuffix(path.Base(e.Name), ".gz")
+		out := strings.TrimSuffix(in, ".zip") + "_" + strings.TrimSuffix(member, ".tar") + ".html"
+		if err := writeHTML(e.Result, out, t0); err != nil {
+			fmt.Fprintln(os.Stderr, "pmm-dump-info:", err)
+			worst = max(worst, 1)
+		}
+	}
+	return worst
+}
+
+// scanError prints a scan error and returns its exit code (0 when nil).
+func scanError(err error) int {
+	if err == nil {
+		return 0
+	}
+	fmt.Fprintln(os.Stderr, "pmm-dump-info:", err)
+	var qe *inspect.QANSchemaError
+	if errors.As(err, &qe) {
+		return 3
+	}
+	return 1
+}
+
+// writeHTML writes the HTML report to out and opens it in the browser.
+func writeHTML(r *inspect.Result, out string, t0 time.Time) error {
 	f, err := os.Create(out)
 	if err != nil {
-		fail(err)
+		return err
 	}
 	if err := report.WriteHTML(f, r); err != nil {
 		f.Close()
-		fail(err)
+		return err
 	}
 	if err := f.Close(); err != nil {
-		fail(err)
+		return err
 	}
 	fmt.Fprintf(os.Stderr, "%d vm chunks, %d services, %d QAN rows in %s -> %s\n",
 		len(r.VM.Chunks), len(r.VM.Services), r.QAN.Rows, time.Since(t0).Round(time.Second), out)
@@ -77,9 +131,7 @@ func main() {
 	if runtime.GOOS == "darwin" {
 		cmd = "open"
 	}
-	if err := exec.Command(cmd, out).Start(); err != nil {
-		fail(err)
-	}
+	return exec.Command(cmd, out).Start()
 }
 
 // colorMode resolves -color: auto is on when stdout is a terminal, NO_COLOR is
