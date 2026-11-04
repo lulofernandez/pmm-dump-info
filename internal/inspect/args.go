@@ -70,7 +70,7 @@ func ParseArgs(s string) Args {
 			a.Flags = append(a.Flags, Flag{Name: f.name, Value: v, Count: 1})
 		}
 
-		val := strings.Trim(f.value, `"'`)
+		val := unquote(f.value)
 		switch f.name {
 		case "start-ts":
 			a.Start = val
@@ -102,6 +102,7 @@ func ParseArgs(s string) Args {
 		masked = append(masked, "--"+f.Name+"="+f.Value)
 	}
 	a.Masked = strings.Join(masked, " ")
+	a.Range = rangeText(a.Start, a.End)
 
 	a.Source = "pmm-dump CLI"
 	for _, f := range a.Flags {
@@ -110,6 +111,31 @@ func ParseArgs(s string) Args {
 		}
 	}
 	return a
+}
+
+// unquote removes one pair of matching quotes around a value
+// (--where="a = 'b'"), and leaves quotes that are part of it
+// (--where=service_name='db1').
+func unquote(v string) string {
+	if len(v) >= 2 && (v[0] == '"' || v[0] == '\'') && v[len(v)-1] == v[0] {
+		return v[1 : len(v)-1]
+	}
+	return v
+}
+
+// rangeText is the requested range. Without --end-ts pmm-dump exports up to
+// the export time, and without --start-ts the 4 hours before the end
+// (defaultTimeframe in cmd/pmm-dump/main.go).
+func rangeText(start, end string) string {
+	switch {
+	case start == "" && end == "":
+		return "not set: the 4 hours before the export (pmm-dump default)"
+	case start == "":
+		return "end - 4h (default) -> " + end
+	case end == "":
+		return start + " -> export time (default)"
+	}
+	return start + " -> " + end
 }
 
 // maskURL hides the password of user:password@ in URLs (--pmm-url,

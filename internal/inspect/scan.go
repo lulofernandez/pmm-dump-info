@@ -70,6 +70,7 @@ func Scan(file, pass string, deep, skipQAN bool, workers int) (*Result, error) {
 		return nil, fmt.Errorf("%s: no meta.json, this does not look like a pmm-dump file", file)
 	}
 	r.Args = ParseArgs(r.Meta.Arguments)
+	r.PMMDump = pmmDumpVersion(r.Meta)
 	r.VM = vm.summary(r.Meta.VMDataFormat)
 	if r.QAN, err = qan.summary(r.Meta.PMMServerVersion); err != nil {
 		return nil, err
@@ -500,4 +501,17 @@ func hashLabels(m map[string]string) uint64 {
 		h *= 1099511628211
 	}
 	return h
+}
+
+// pmmDumpVersion is branch@commit; the PMM 2 builds and the PMM UI leave
+// both empty, and some builds only the branch.
+func pmmDumpVersion(m *Meta) string {
+	b, c := m.Version.GitBranch, m.Version.GitCommit
+	switch {
+	case b != "" && c != "":
+		return b + "@" + c
+	case b+c != "":
+		return b + c
+	}
+	return "-"
 }

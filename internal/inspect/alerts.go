@@ -2,8 +2,17 @@ package inspect
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 )
+
+// exactAlternation finds label="a|b" in a series selector: with = the | is
+// literal, so it matches no series; label=~"a|b" was meant.
+var exactAlternation = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]*\|[^"]*)"`)
+
+// qanKinds are the service types PMM collects QAN for.
+var qanKinds = map[string]bool{"mysql": true, "mongodb": true, "postgresql": true}
 
 // tolerance before a gap between the requested and the real range is reported.
 const rangeSlack = 10 * time.Minute
@@ -43,6 +52,12 @@ func alerts(r *Result) []Alert {
 	if r.Args.DumpCore && len(r.VM.Chunks) == 0 {
 		warn("Core metrics were requested but the dump has no vm/ chunks")
 	}
+	if r.Deep && r.VM.Format == "json" && len(r.VM.Chunks) > 0 && r.VM.Samples == 0 {
+		warn("The dump has %d vm/ chunks but no samples: the export filters matched no series", len(r.VM.Chunks))
+	}
+	for _, m := range exactAlternation.FindAllStringSubmatch(r.Args.TSSelector, -1) {
+		warn(`--ts-selector has %s="%s": with = the | is literal and matches no series, %s=~ was meant`, m[1], m[2], m[1])
+	}
 	if r.VM.Format == "native" {
 		info("Metrics are in VictoriaMetrics native format (--vm-native-data): services and real time range are not decoded, only the chunk time range")
 	}
@@ -80,6 +95,25 @@ func alerts(r *Result) []Alert {
 		}
 	}
 
+	// services whose scrapes returned only the series vmagent adds itself
+	if r.Deep {
+		for _, s := range r.VM.Services {
+			if s.Kind == "pmm-server" || len(s.Families) == 0 {
+				continue
+			}
+			only := true
+			for f := range s.Families {
+				if f != "up" && f != "scrape" {
+					only = false
+					break
+				}
+			}
+			if only {
+				warn("%s %s has only up/scrape series (%d): its exporter returned no metrics in the range (check the up series)", s.Kind, s.Name, s.Series)
+			}
+		}
+	}
+
 	// services with gaps: chunks without samples inside their own range
 	if r.Deep {
 		for _, s := range r.VM.Services {
@@ -103,17 +137,25 @@ func alerts(r *Result) []Alert {
 		}
 	}
 
-	// services with metrics but no QAN, when there is QAN
-	// (pmm-server-postgresql is PMM's own database, it never has QAN)
+	// services with metrics but no QAN, when there is QAN; only the types
+	// PMM has QAN for (pmm-server-postgresql is PMM's own database, it never has QAN)
 	if r.Deep && len(r.QAN.Services) > 0 {
 		have := map[string]bool{}
 		for _, q := range r.QAN.Services {
 			have[q.Name] = true
 		}
+		var missing []string
 		for _, s := range r.VM.Services {
-			if s.Kind != "node" && s.Kind != "-" && s.Kind != "pmm-server" && s.Name != "pmm-server-postgresql" && !have[s.Name] {
-				info("%s %s has metrics but no QAN", s.Kind, s.Name)
+			if qanKinds[s.Kind] && s.Name != "pmm-server-postgresql" && !have[s.Name] {
+				missing = append(missing, s.Kind+" "+s.Name)
 			}
+		}
+		switch len(missing) {
+		case 0:
+		case 1:
+			info("%s has metrics but no QAN", missing[0])
+		default:
+			info("%d services have metrics but no QAN: %s", len(missing), strings.Join(missing, ", "))
 		}
 	}
 

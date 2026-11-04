@@ -119,12 +119,12 @@
       dl.appendChild(el("dt", {}, k));
       dl.appendChild(el("dd", mono ? { class: "mono" } : {}, v || "-"));
     };
-    add("pmm-dump", meta.version["git-branch"] + "@" + meta.version["git-commit"]);
+    add("pmm-dump", D.pmmDump);
     add("PMM Server", meta["pmm-server-version"]);
     add("Exported from", args.source);
     add("PMM timezone", meta["pmm-server-timezone"] || "-");
     add("Encrypted", D.encrypted ? "yes" : "no");
-    add("Requested range", (args.start || "-") + " -> " + (args.end || "-"));
+    add("Requested range", args.range);
     add("Core metrics", (args.dumpCore ? "yes" : "no") + " (" + vm.format + " format)");
     add("QAN", args.dumpQAN ? "yes" : "no");
     if (args.instances) add("--instance", args.instances.join(", "), true);

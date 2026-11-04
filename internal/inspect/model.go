@@ -9,13 +9,14 @@ type Result struct {
 	Encrypted bool   `json:"encrypted"`
 	Deep      bool   `json:"deep"` // chunk contents were read
 
-	Meta   *Meta      `json:"meta"`
-	Args   Args       `json:"args"`
-	Log    LogSummary `json:"log"`
-	VM     VMSummary  `json:"vm"`
-	QAN    QANSummary `json:"qan"`
-	Other  []string   `json:"other,omitempty"` // tar entries outside meta/log/vm/ch
-	Alerts []Alert    `json:"alerts"`
+	Meta    *Meta      `json:"meta"`
+	PMMDump string     `json:"pmmDump"` // pmm-dump version: branch@commit
+	Args    Args       `json:"args"`
+	Log     LogSummary `json:"log"`
+	VM      VMSummary  `json:"vm"`
+	QAN     QANSummary `json:"qan"`
+	Other   []string   `json:"other,omitempty"` // tar entries outside meta/log/vm/ch
+	Alerts  []Alert    `json:"alerts"`
 }
 
 // Meta is meta.json as written by pmm-dump (pkg/dump.Meta).
@@ -41,6 +42,7 @@ type Meta struct {
 type Args struct {
 	Masked     string   `json:"masked"` // secrets replaced by ***
 	Source     string   `json:"source"` // "PMM UI" or "pmm-dump CLI"
+	Range      string   `json:"range"`  // requested range, with pmm-dump defaults
 	Start      string   `json:"start,omitempty"`
 	End        string   `json:"end,omitempty"`
 	Instances  []string `json:"instances,omitempty"` // deduplicated

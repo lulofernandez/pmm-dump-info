@@ -25,7 +25,7 @@ func WriteText(w io.Writer, r *inspect.Result, color bool) {
 	var kv [][]string
 	row := func(k, v string) { kv = append(kv, []string{k, v}) }
 	p("%s\n", c.paint(styleTitle, "Dump"))
-	row("pmm-dump", m.Version.GitBranch+"@"+m.Version.GitCommit)
+	row("pmm-dump", r.PMMDump)
 	row("PMM Server", m.PMMServerVersion)
 	row("Exported from", r.Args.Source)
 	tz := "-"
@@ -34,7 +34,7 @@ func WriteText(w io.Writer, r *inspect.Result, color bool) {
 	}
 	row("PMM timezone", tz)
 	row("Encrypted", yesNo(r.Encrypted))
-	row("Requested range", orDash(r.Args.Start)+" -> "+orDash(r.Args.End))
+	row("Requested range", r.Args.Range)
 	row("Core metrics", yesNo(r.Args.DumpCore)+" (format "+r.VM.Format+")")
 	row("QAN", yesNo(r.Args.DumpQAN))
 	if len(r.Args.Instances) > 0 {
