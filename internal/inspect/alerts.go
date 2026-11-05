@@ -24,7 +24,7 @@ func alerts(r *Result) []Alert {
 
 	if !r.Deep {
 		info("-quick: chunk contents not read, so services, samples, QAN rows and the alerts based on them " +
-			"(no samples, up/scrape only, --instance without metrics, gaps, real range) are not checked")
+			"(no samples, up/scrape only, --instance without metrics or without OS metrics, gaps, real range) are not checked")
 	}
 
 	// QAN
@@ -67,12 +67,28 @@ func alerts(r *Result) []Alert {
 		info("Metrics are in VictoriaMetrics native format (--vm-native-data): services and real time range are not decoded, only the chunk time range")
 	}
 
+	// requested range vs pmm-dump defaults and export time
+	exported, expErr := time.Parse(time.RFC3339, r.Log.First)
+	endAfterExport := false
+	if r.Args.Start == "" {
+		if r.Args.End == "" {
+			warn("--start-ts and --end-ts not set: the dump covers only the 4 hours before the export (pmm-dump default)")
+		} else {
+			warn("--start-ts not set: the dump covers only the 4 hours before --end-ts %s (pmm-dump default)", r.Args.End)
+		}
+	}
+	if end, err := time.Parse(time.RFC3339, r.Args.End); err == nil && expErr == nil && end.Sub(exported) > rangeSlack {
+		endAfterExport = true
+		warn("--end-ts %s is %s after the export (%s): there is no data after the export time",
+			r.Args.End, durStr(end.Sub(exported)), exported.UTC().Format("2006-01-02 15:04:05Z"))
+	}
+
 	// requested vs real range
 	if r.Deep && r.VM.Last > 0 {
 		if t, err := time.Parse(time.RFC3339, r.Args.Start); err == nil && time.UnixMilli(r.VM.First).Sub(t) > rangeSlack {
 			warn("Metrics start at %s, later than the requested --start-ts %s", fmtTime(r.VM.First), r.Args.Start)
 		}
-		if t, err := time.Parse(time.RFC3339, r.Args.End); err == nil && t.Sub(time.UnixMilli(r.VM.Last)) > rangeSlack {
+		if t, err := time.Parse(time.RFC3339, r.Args.End); err == nil && !endAfterExport && t.Sub(time.UnixMilli(r.VM.Last)) > rangeSlack {
 			warn("Metrics end at %s, earlier than the requested --end-ts %s", fmtTime(r.VM.Last), r.Args.End)
 		}
 	}
@@ -98,6 +114,36 @@ func alerts(r *Result) []Alert {
 				warn("--instance=%s is a node, but the dump has no node metrics for it (no OS metrics)%s",
 					in, instanceNodeHint(r))
 			}
+		}
+	}
+
+	// --instance names a service but not its node: no OS metrics for that node
+	if r.Deep && r.VM.Format == "json" && len(r.Args.Instances) > 0 {
+		requested := map[string]bool{}
+		for _, in := range r.Args.Instances {
+			requested[in] = true
+		}
+		nodeRows := map[string]bool{}
+		for _, s := range r.VM.Services {
+			if s.Kind == "node" {
+				nodeRows[s.Node] = true
+			}
+		}
+		var nodes []string
+		byNode := map[string][]string{}
+		for _, s := range r.VM.Services {
+			if s.Kind == "node" || s.Node == "" || s.Node == "pmm-server" || !requested[s.Name] ||
+				requested[s.Node] || nodeRows[s.Node] {
+				continue
+			}
+			if byNode[s.Node] == nil {
+				nodes = append(nodes, s.Node)
+			}
+			byNode[s.Node] = append(byNode[s.Node], s.Name)
+		}
+		for _, n := range nodes {
+			warn("No OS (node) metrics for node %s: --instance names its service %s but not the node",
+				n, strings.Join(byNode[n], ", "))
 		}
 	}
 
@@ -219,4 +265,17 @@ func instanceServiceOnly(v [3]int) bool {
 		return versionLess(v, [3]int{3, 8, 0})
 	}
 	return false
+}
+
+// durStr prints a duration as 2h15m, 18h, 45m.
+func durStr(d time.Duration) string {
+	d = d.Round(time.Minute)
+	h, m := int(d.Hours()), int(d.Minutes())%60
+	switch {
+	case h == 0:
+		return fmt.Sprintf("%dm", m)
+	case m == 0:
+		return fmt.Sprintf("%dh", h)
+	}
+	return fmt.Sprintf("%dh%dm", h, m)
 }

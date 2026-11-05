@@ -220,3 +220,59 @@ func TestMetricsButNoQANGrouped(t *testing.T) {
 		t.Errorf("alerts = %q", got)
 	}
 }
+
+func TestServiceInstanceWithoutNode(t *testing.T) {
+	r := &Result{Deep: true}
+	r.VM.Format = "json"
+	r.Args.Start, r.Args.End = "2026-01-01T00:00:00Z", "2026-01-01T01:00:00Z"
+	r.Args.Instances = []string{"db1-mysql", "db2-mysql", "db3-mysql", "db3", "pmm-server-postgresql"}
+	r.VM.Services = []Service{
+		{Name: "db1-mysql", Kind: "mysql", Node: "db1"},
+		{Name: "db2-mysql", Kind: "mysql", Node: "db2"},
+		{Name: "db2", Kind: "node", Node: "db2"},
+		{Name: "db3-mysql", Kind: "mysql", Node: "db3"},
+		{Name: "other-mysql", Kind: "mysql", Node: "db4"},
+		{Name: "pmm-server-postgresql", Kind: "postgresql", Node: "pmm-server"},
+	}
+	var got []string
+	for _, a := range alerts(r) {
+		if strings.Contains(a.Text, "No OS") {
+			got = append(got, a.Text)
+		}
+	}
+	want := []string{"No OS (node) metrics for node db1: --instance names its service db1-mysql but not the node"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("alerts = %q", got)
+	}
+}
+
+func TestRangeAlerts(t *testing.T) {
+	find := func(r *Result, sub string) string {
+		for _, a := range alerts(r) {
+			if strings.Contains(a.Text, sub) {
+				return a.Text
+			}
+		}
+		return ""
+	}
+	r := &Result{}
+	r.Log.First = "2026-07-28T12:45:34Z"
+	if got := find(r, "not set"); got != "--start-ts and --end-ts not set: the dump covers only the 4 hours before the export (pmm-dump default)" {
+		t.Errorf("no range: %q", got)
+	}
+	r.Args.End = "2026-07-28T10:00:00Z"
+	if got := find(r, "not set"); got != "--start-ts not set: the dump covers only the 4 hours before --end-ts 2026-07-28T10:00:00Z (pmm-dump default)" {
+		t.Errorf("no start: %q", got)
+	}
+	r.Args.Start, r.Args.End = "2026-07-28T11:00:00+02:00", "2026-07-28T17:00:00+02:00"
+	if got := find(r, "after the export"); got != "--end-ts 2026-07-28T17:00:00+02:00 is 2h14m after the export (2026-07-28 12:45:34Z): there is no data after the export time" {
+		t.Errorf("future end: %q", got)
+	}
+	if got := find(r, "not set"); got != "" {
+		t.Errorf("unexpected: %q", got)
+	}
+	r.Args.End = "2026-07-28T12:50:00Z"
+	if got := find(r, "after the export"); got != "" {
+		t.Errorf("within slack: %q", got)
+	}
+}
