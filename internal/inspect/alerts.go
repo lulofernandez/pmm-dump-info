@@ -95,7 +95,8 @@ func alerts(r *Result) []Alert {
 			case !found:
 				warn("--instance=%s was requested but there are no metrics for it", in)
 			case nodeOfService && !nodeRow:
-				warn("--instance=%s is a node, but the dump has no node metrics for it (no OS metrics)", in)
+				warn("--instance=%s is a node, but the dump has no node metrics for it (no OS metrics)%s",
+					in, instanceNodeHint(r))
 			}
 		}
 	}
@@ -184,4 +185,38 @@ func fmtTime(ms int64) string {
 		return "-"
 	}
 	return time.UnixMilli(ms).UTC().Format("2006-01-02 15:04:05Z")
+}
+
+// instanceNodeHint explains a node --instance without node metrics: before
+// pmm-dump SE-105 (commit 1fe0ea6), --instance=X only selects
+// {service_name="X"}, and node_exporter series have no service_name. Release
+// branches with SE-105: pmm-2.43.0+ and pmm-3.8.0+ (not 3.0.0 to 3.7.1).
+// A UI export runs the pmm-dump of the PMM Server, so its version tells; a CLI
+// export may run any pmm-dump, so only the general rule is given.
+func instanceNodeHint(r *Result) string {
+	const rule = "PMM 3.0.0 to 3.7.x and 2.x before 2.43.0"
+	if !strings.HasPrefix(r.Args.Source, "PMM UI") {
+		return "; the pmm-dump of " + rule + " matches --instance only against service_name"
+	}
+	if r.Meta == nil {
+		return ""
+	}
+	v, ok := version(r.Meta.PMMServerVersion)
+	if !ok || !instanceServiceOnly(v) {
+		return ""
+	}
+	return fmt.Sprintf("; the pmm-dump of PMM %s matches --instance only against service_name (%s), "+
+		"node metrics come only with a node_name selector (--ts-selector)", r.Meta.PMMServerVersion, rule)
+}
+
+// instanceServiceOnly reports whether the pmm-dump of this PMM version
+// matches --instance only against service_name.
+func instanceServiceOnly(v [3]int) bool {
+	switch v[0] {
+	case 2:
+		return versionLess(v, [3]int{2, 43, 0})
+	case 3:
+		return versionLess(v, [3]int{3, 8, 0})
+	}
+	return false
 }

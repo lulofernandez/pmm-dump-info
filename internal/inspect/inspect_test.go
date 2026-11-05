@@ -86,11 +86,39 @@ func TestInstanceNodeWithoutNodeMetrics(t *testing.T) {
 		}
 	}
 	want := []string{
-		"--instance=db1 is a node, but the dump has no node metrics for it (no OS metrics)",
+		"--instance=db1 is a node, but the dump has no node metrics for it (no OS metrics); the pmm-dump of PMM 3.0.0 to 3.7.x and 2.x before 2.43.0 matches --instance only against service_name",
 		"--instance=db2 was requested but there are no metrics for it",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("alerts = %q", got)
+	}
+	nodeAlert := func() string {
+		for _, a := range alerts(r) {
+			if strings.Contains(a.Text, "db1 is a node") {
+				return a.Text
+			}
+		}
+		return ""
+	}
+	r.Meta = &Meta{}
+	r.Args.Source = "PMM UI (Help > PMM Dump)"
+	for _, c := range []struct{ pmm, want string }{
+		{"3.7.1", "; the pmm-dump of PMM 3.7.1 matches --instance only against service_name (PMM 3.0.0 to 3.7.x and 2.x before 2.43.0), node metrics come only with a node_name selector (--ts-selector)"},
+		{"2.42.0", "; the pmm-dump of PMM 2.42.0 matches"},
+		{"3.8.0", ""},
+		{"2.43.0", ""},
+		{"", ""},
+	} {
+		r.Meta.PMMServerVersion = c.pmm
+		got := strings.TrimPrefix(nodeAlert(), "--instance=db1 is a node, but the dump has no node metrics for it (no OS metrics)")
+		if (c.want == "" && got != "") || !strings.HasPrefix(got, c.want) {
+			t.Errorf("UI %s: hint = %q", c.pmm, got)
+		}
+	}
+	r.Args.Source = "pmm-dump CLI"
+	r.Meta.PMMServerVersion = "3.9.1"
+	if !strings.HasSuffix(nodeAlert(), "; the pmm-dump of PMM 3.0.0 to 3.7.x and 2.x before 2.43.0 matches --instance only against service_name") {
+		t.Errorf("CLI hint = %q", nodeAlert())
 	}
 	r.VM.Services = append(r.VM.Services, Service{Name: "db1", Kind: "node", Node: "db1"})
 	for _, a := range alerts(r) {
