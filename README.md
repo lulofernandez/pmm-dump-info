@@ -28,16 +28,6 @@ cd pmm-dump-info
 go build -o pmm-dump-info .
 ```
 
-On macOS, `./build-mac.sh` builds `dist/pmm-dump-info` (universal) and `dist/pmm-dump-info-linux-amd64`. Copy the Linux binary to the server where the dumps are, to read them there without downloading them.
-
-To open dumps from Finder:
-
-```
-./install-finder.sh
-```
-
-Then right-click a dump > Open With > pmm-dump-info. The HTML report is written next to the dump and opened in the browser. Several files can be selected at once.
-
 ## Usage
 
 ```
@@ -153,7 +143,7 @@ With a .zip, the exit code is the worst one of its dumps.
 
 ```
 go test ./...
-tools/update-qan-schema.sh --check   # warns when PMM has new QAN migrations (also run by build-mac.sh)
+tools/update-qan-schema.sh --check   # warns when PMM has new QAN migrations
 ```
 
 `internal/inspect/qan_columns.txt` is generated from the PMM ClickHouse migrations by `tools/update-qan-schema.sh`. Do not edit it by hand.
