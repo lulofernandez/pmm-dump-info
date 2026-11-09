@@ -90,18 +90,6 @@ Before importing anything, this says the dump has no QAN at all, no CPU, memory 
 
 The HTML report (`-open`) shows the same, plus a coverage chart with metrics and QAN per service over time, and the samples per chunk.
 
-## What it checks
-
-| Area | Checks |
-|---|---|
-| Time range | `--start-ts`/`--end-ts` not set, so only the 4 hours before the export (pmm-dump default); `--end-ts` after the export time; metrics starting later or ending earlier than requested |
-| `--instance` | an instance with no metrics at all; a service named without its node, so no OS metrics for that node; a node named but no node metrics, with a hint when the pmm-dump version matches `--instance` only against `service_name` (PMM 3.0.0 to 3.7.x, 2.x before 2.43.0) |
-| `--ts-selector` | `label="a\|b"` (with `=` the `\|` is literal and matches nothing; `=~` was meant) |
-| Metrics | core metrics requested but no chunks; chunks with no samples (the filters matched nothing); services with only `up`/`scrape` series (the exporter returned nothing); gaps in a service's collection |
-| QAN | requested but missing or empty, with the row count from `log.json`; MySQL, MongoDB and PostgreSQL services with metrics but no QAN; export done without `--dump-qan` |
-| Export log | error and warning lines in `log.json` |
-| The file | read errors in chunks or QAN files; dump from a PMM newer than the QAN layouts the tool knows |
-
 ## Reading the output
 
 | Section | What it tells you |
@@ -120,6 +108,18 @@ The report shows only the warnings and errors of `log.json`. To read the whole e
 ```
 tar xOzf <dump.tar.gz> log.json | jq -r '"\(.time) \(.level) \(.message)"'
 ```
+
+## What it checks
+
+| Area | Checks |
+|---|---|
+| Time range | `--start-ts`/`--end-ts` not set, so only the 4 hours before the export (pmm-dump default); `--end-ts` after the export time; metrics starting later or ending earlier than requested |
+| `--instance` | an instance with no metrics at all; a service named without its node, so no OS metrics for that node; a node named but no node metrics, with a hint when the pmm-dump version matches `--instance` only against `service_name` (PMM 3.0.0 to 3.7.x, 2.x before 2.43.0) |
+| `--ts-selector` | `label="a\|b"` (with `=` the `\|` is literal and matches nothing; `=~` was meant) |
+| Metrics | core metrics requested but no chunks; chunks with no samples (the filters matched nothing); services with only `up`/`scrape` series (the exporter returned nothing); gaps in a service's collection |
+| QAN | requested but missing or empty, with the row count from `log.json`; MySQL, MongoDB and PostgreSQL services with metrics but no QAN; export done without `--dump-qan` |
+| Export log | error and warning lines in `log.json` |
+| The file | read errors in chunks or QAN files; dump from a PMM newer than the QAN layouts the tool knows |
 
 ## Exit codes
 
