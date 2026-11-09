@@ -119,12 +119,12 @@ The HTML report (`-open`) shows the same, plus a coverage chart with metrics and
 
 | Code | Meaning |
 |---|---|
-| 0 | report printed |
-| 1 | error (not a pmm-dump file, wrong password, read error) |
-| 2 | usage |
-| 3 | the QAN rows follow a column layout this build does not know |
+| 0 | the report was printed. Alerts do not change the exit code |
+| 1 | the file could not be read: not a pmm-dump file, missing or wrong password, a damaged file |
+| 2 | wrong command line: no file or more than one given, or an invalid `-color` value. The usage help is printed |
+| 3 | the QAN rows follow a column layout this build does not know (see Keeping it up to date) |
 
-With a .zip, the exit code is the worst one of its dumps.
+A .zip with several dumps gives one exit code for all of them. If every dump was read, it is 0. If any dump failed, it is 3 when one of them hit an unknown QAN layout, otherwise 1. The dumps that were read still get their report.
 
 ## Keeping it up to date
 
