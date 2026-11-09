@@ -126,10 +126,37 @@ The HTML report (`-open`) shows the same, plus a coverage chart with metrics and
 
 With a .zip, the exit code is the worst one of its dumps.
 
+## Keeping it up to date
+
+The QAN rows in a dump have no header. Their column order is the one of the ClickHouse table `pmm.metrics` in the PMM that exported the dump, and PMM releases change it. The tool keeps the known layouts in `internal/inspect/qan_columns.txt`, one per PMM release that changed the table, generated from the PMM ClickHouse migrations (`qan-api2/migrations/sql` in percona/pmm, and percona/qan-api2 for releases older than PMM 2.33). A new PMM release can bring a new layout, so a build that worked last month may not read the QAN of a dump from a newer PMM.
+
+To get the latest version:
+
+```
+git pull
+go build -o pmm-dump-info .
+```
+
+The tool tells you when its layouts may be out of date:
+
+- the report warns when the dump comes from a PMM newer than the latest release the layouts know;
+- the report reminds you when the layouts were last checked more than 30 days ago;
+- the tool stops with exit code 3 when the QAN rows follow no known layout, and says which file and row did not match.
+
+To regenerate the layouts from the PMM repository and rebuild (needs git, Go and access to github.com):
+
+```
+tools/update-qan-schema.sh --check   # exit 1 when PMM has new migrations
+tools/update-qan-schema.sh           # rewrite qan_columns.txt
+go build -o pmm-dump-info .
+```
+
+Do not edit `qan_columns.txt` by hand. Until it is updated, `-skip-qan` gives the rest of the report. If the script itself fails, a new migration uses SQL that `tools/qanschema` does not parse yet, or a column type that `internal/qantype` cannot check, and the code needs a change.
+
 ## Limits
 
 - **Native format.** Dumps exported with `--vm-native-data` are not decoded, so services and real time ranges are unknown and only the chunk time ranges are shown.
-- **QAN layouts.** QAN rows have no header, and their column order changes between PMM releases. The tool knows the layouts up to the PMM release it was built with, and a dump from a newer PMM may stop it with exit code 3. Then run `tools/update-qan-schema.sh` and rebuild, or use `-skip-qan` for the rest of the report.
+- **QAN layouts.** QAN rows have no header, and their column order changes between PMM releases. The tool knows the layouts up to the PMM release it was built with, and a dump from a newer PMM may stop it with exit code 3 (see Keeping it up to date).
 - **`-quick`** does not read the chunks, so the checks based on them (services, samples, gaps, real range, `--instance`) are skipped. The report lists which ones.
 - **It reads, it does not import.** It does not show metric values or graphs. For that, import the dump into a PMM Server.
 
@@ -137,9 +164,6 @@ With a .zip, the exit code is the worst one of its dumps.
 
 ```
 go test ./...
-tools/update-qan-schema.sh --check   # warns when PMM has new QAN migrations
 ```
-
-`internal/inspect/qan_columns.txt` is generated from the PMM ClickHouse migrations by `tools/update-qan-schema.sh`. Do not edit it by hand.
 
 Never add real dumps, logs or outputs to the repository, not even as test fixtures. Tests build their dumps in code.
