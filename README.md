@@ -103,12 +103,6 @@ The HTML report (`-open`) shows the same, plus a coverage chart with metrics and
 
 "Requested range" is what the export asked for. The real range of each service is in its FIRST and LAST columns, and that is what you will see after the import.
 
-The report shows only the warnings and errors of `log.json`. To read the whole export log:
-
-```
-tar xOzf <dump.tar.gz> log.json | jq -r '"\(.time) \(.level) \(.message)"'
-```
-
 ## What it checks
 
 | Area | Checks |
