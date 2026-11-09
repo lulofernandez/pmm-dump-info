@@ -140,7 +140,6 @@ go build -o pmm-dump-info .
 The tool tells you when it may be out of date:
 
 - the report warns when the dump comes from a PMM newer than the latest release the layouts know;
-- the report reminds you when the layouts were last checked more than 30 days ago;
 - the tool stops with exit code 3 when the QAN rows follow no known layout, and says which file and row did not match.
 
 Until a version with the new layout is available, `-skip-qan` gives the rest of the report.

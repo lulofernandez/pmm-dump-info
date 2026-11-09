@@ -48,10 +48,6 @@ func alerts(r *Result) []Alert {
 			"The rows match the newest known schema; refresh them with tools/update-qan-schema.sh",
 			r.Meta.PMMServerVersion, QANSchemas.LatestRelease, QANSchemas.Checked)
 	}
-	if len(r.QAN.Files) > 0 && QANSchemas.stale(time.Now()) {
-		info("QAN schemas last checked on %s, more than %d days ago: run tools/update-qan-schema.sh --check",
-			QANSchemas.Checked, int(staleAfter.Hours()/24))
-	}
 
 	// core metrics
 	if r.Args.DumpCore && len(r.VM.Chunks) == 0 {
