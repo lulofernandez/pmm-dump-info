@@ -153,9 +153,13 @@ Until a version with the new layout is available, `-skip-qan` gives the rest of 
 
 ## Development
 
+Run the unit tests after a code change:
+
 ```
 go test ./...
 ```
+
+They check, without real dumps, the parsing of the export arguments (including secret masking), each alert, the QAN row checks against the known layouts, reading dumps inside a .zip, and the table alignment of the colored text report. All packages should print `ok`.
 
 `qan_columns.txt` is generated from the PMM ClickHouse migrations (`qan-api2/migrations/sql` in percona/pmm, and percona/qan-api2 for releases older than PMM 2.33). Do not edit it by hand. To check for new migrations and regenerate it (needs git, Go and access to github.com):
 
