@@ -86,7 +86,7 @@ Export log (log.json): 4 lines, 2026-10-20T14:05:11Z -> 2026-10-20T14:05:41Z (30
   2026-10-20T14:05:12Z WARN Failed to get PMM version error=connection refused
 ```
 
-Before importing anything, this says the dump has no QAN at all, no CPU, memory or disk metrics for `db-01`, and a one-hour hole in `db-02-mysql`.
+This report says the dump has no QAN at all, no CPU, memory or disk metrics for `db-01`, and a one-hour hole in `db-02-mysql`.
 
 The HTML report (`-open`) shows the same, plus a coverage chart with metrics and QAN per service over time, and the samples per chunk.
 
