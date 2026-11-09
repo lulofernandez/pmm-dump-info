@@ -169,5 +169,3 @@ tools/update-qan-schema.sh           # rewrite qan_columns.txt
 ```
 
 If the script fails, a new migration uses SQL that `tools/qanschema` does not parse yet, or a column type that `internal/qantype` cannot check, and the code needs a change.
-
-Never add real dumps, logs or outputs to the repository, not even as test fixtures. Tests build their dumps in code.
