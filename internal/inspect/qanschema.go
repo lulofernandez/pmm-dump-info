@@ -219,11 +219,3 @@ func (set *QANSchemaSet) withColumns(n int) []*QANSchema {
 	}
 	return out
 }
-
-// staleAfter is when a reminder to re-run tools/update-qan-schema.sh shows.
-const staleAfter = 30 * 24 * time.Hour
-
-func (set *QANSchemaSet) stale(now time.Time) bool {
-	t, err := time.Parse("2006-01-02", set.Checked)
-	return err != nil || now.Sub(t) > staleAfter
-}
