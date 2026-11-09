@@ -160,12 +160,3 @@ go test ./...
 ```
 
 They check, without real dumps, the parsing of the export arguments (including secret masking), each alert, the QAN row checks against the known layouts, reading dumps inside a .zip, and the table alignment of the colored text report. All packages should print `ok`.
-
-`qan_columns.txt` is generated from the PMM ClickHouse migrations (`qan-api2/migrations/sql` in percona/pmm, and percona/qan-api2 for releases older than PMM 2.33). Do not edit it by hand. To check for new migrations and regenerate it (needs git, Go and access to github.com):
-
-```
-tools/update-qan-schema.sh --check   # exit 1 when PMM has new migrations
-tools/update-qan-schema.sh           # rewrite qan_columns.txt
-```
-
-If the script fails, a new migration uses SQL that `tools/qanschema` does not parse yet, or a column type that `internal/qantype` cannot check, and the code needs a change.
