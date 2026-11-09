@@ -2,7 +2,7 @@
 
 Tells you what is inside a [pmm-dump](https://github.com/percona/pmm-dump) file before you import it into a PMM Server.
 
-A customer exports a dump from the PMM UI or with the pmm-dump CLI and uploads it to the case. Importing it takes time and a matching PMM Server, and often the dump turns out to be missing what you need (no QAN, no OS metrics, the wrong time range). pmm-dump-info reads the file in place and answers in seconds:
+A dump exported from the PMM UI or with the pmm-dump CLI can be large, and importing it takes time and a matching PMM Server. Often it turns out to be missing what you need (no QAN, no OS metrics, the wrong time range). pmm-dump-info reads the file in place and answers in seconds:
 
 - which PMM and pmm-dump versions made it, from the UI or the CLI, and whether it is encrypted;
 - how it was exported (time range, `--instance`, `--ts-selector`, `--where`, QAN or not), with secrets masked;
@@ -16,7 +16,7 @@ pmm-dump-info -open pmm-dump-1792505141.tar.gz    # HTML report in the browser
 pmm-dump-info -quick big-dump.tar.gz              # versions and export arguments only, faster
 ```
 
-Nothing is sent anywhere. The HTML report has its data, script and styles inline, so customer data stays on the machine.
+Nothing is sent anywhere. The HTML report has its data, script and styles inline, so the dump data stays on the machine.
 
 ## Install
 
@@ -28,7 +28,7 @@ cd pmm-dump-info
 go build -o pmm-dump-info .
 ```
 
-On macOS, `./build-mac.sh` builds `dist/pmm-dump-info` (universal) and `dist/pmm-dump-info-linux-amd64`. Copy the Linux binary to the lab hosts to read dumps where they are, without downloading them.
+On macOS, `./build-mac.sh` builds `dist/pmm-dump-info` (universal) and `dist/pmm-dump-info-linux-amd64`. Copy the Linux binary to the server where the dumps are, to read them there without downloading them.
 
 To open dumps from Finder:
 
@@ -96,7 +96,7 @@ Export log (log.json): 4 lines, 2026-10-20T14:05:11Z -> 2026-10-20T14:05:41Z (30
   2026-10-20T14:05:12Z WARN Failed to get PMM version error=connection refused
 ```
 
-Before importing anything, this says the dump has no QAN at all, no CPU, memory or disk metrics for `db-01`, and a one-hour hole in `db-02-mysql`. If the case needs any of those, ask for a new export now.
+Before importing anything, this says the dump has no QAN at all, no CPU, memory or disk metrics for `db-01`, and a one-hour hole in `db-02-mysql`. If you need any of those, export the dump again with the right options.
 
 The HTML report (`-open`) shows the same, plus a coverage chart with metrics and QAN per service over time, and the samples per chunk.
 
@@ -158,4 +158,4 @@ tools/update-qan-schema.sh --check   # warns when PMM has new QAN migrations (al
 
 `internal/inspect/qan_columns.txt` is generated from the PMM ClickHouse migrations by `tools/update-qan-schema.sh`. Do not edit it by hand.
 
-Never add customer dumps, logs or outputs to the repository, not even as test fixtures. Tests build their dumps in code.
+Never add real dumps, logs or outputs to the repository, not even as test fixtures. Tests build their dumps in code.
